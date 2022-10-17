@@ -27,7 +27,7 @@ def plot_bipartite_match(ref, qry, ypos=(0, 1)):
 
 
 class Images_FigureData:
-    file = "../data/images.pickle"
+    file = "../data/images_figure.pickle"
 
     def make_figure_data(self):
         compare = BionanoCompare()
