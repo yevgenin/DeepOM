@@ -32,8 +32,8 @@ dependencies:
   - imageio
   - biopython
   - numba
-  - moviepy
-  - cupy
-  - tabulate
   - wandb
-  - plotly
+  # - plotly
+  # - moviepy
+  # - cupy
+  # - tabulate

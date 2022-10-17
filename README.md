@@ -15,3 +15,11 @@ This is the implementation of the [paper]().
 CITATION
 
 #   Acknowledgements
+
+#   Installation for development
+```
+conda env create -f environment.yml
+conda activate deepom
+pip install -r requirements.txt
+pip install -e .
+```
