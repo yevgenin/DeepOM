@@ -1,0 +1,39 @@
+name: deepom
+channels:
+  - pytorch
+  - defaults
+  - conda-forge
+
+dependencies:
+  - python=3.9
+  - pytorch
+  - cudatoolkit=11.3
+  - monai
+  - fire
+  - jupyter
+  - more-itertools
+  - nd2reader
+  - gitpython
+  - pyyaml
+  - pytest
+  - numpy
+  - scipy
+  - pandas
+  - joblib
+  - ipython
+  - tqdm
+  - matplotlib
+  - seaborn
+  - statsmodels
+  - tensorboard
+  - torchvision
+  - scikit-learn
+  - scikit-image
+  - imageio
+  - biopython
+  - numba
+  - moviepy
+  - cupy
+  - tabulate
+  - wandb
+  - plotly
