@@ -27,6 +27,8 @@ def plot_bipartite_match(ref, qry, ypos=(0, 1)):
 
 
 class Images_FigureData:
+    file = "../data/images.pickle"
+
     def make_figure_data(self):
         compare = BionanoCompare()
         compare.data_prep.num_sizes = 1
@@ -44,10 +46,15 @@ class Images_FigureData:
 
         compare.localizer_module.rng = default_rng(seed=6)
         compare.localizer_module.genome_data.sparsity = 3500
+        
+        self.refs = compare.refs
         self.data_item = compare.localizer_module.make_data()
         self.inference_item = compare.localizer_module.inference_item(self.data_item.image)
-        joblib.dump(self, "data/images.pickle")
+        joblib.dump(self, self.file)
 
+    @classmethod
+    def load_figure_data(cls):
+        return joblib.load(cls.file)
 
 if __name__ == '__main__':
     from fire import Fire
