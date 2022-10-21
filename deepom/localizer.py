@@ -31,9 +31,10 @@ from tqdm.auto import tqdm
 
 from deepom.utils import uniform_range, Config, uniform_central_range, is_sorted, gaussian_density, filter_valid_coords, \
     Paths, generate_name, path_mkdir, asdict_recursive, nested_dict_filter_types, find_file, num_module_params, \
-    inference_eval, numpy_sigmoid
+    inference_eval, numpy_sigmoid, set_names
 
 
+@set_names
 class Keys:
     SCORE = None
     LOSS_TENSOR = None
@@ -711,7 +712,7 @@ class LocalizerModule(TrainerMixin):
         self.min_spatial_size = 32
         self.load_checkpoint = False
         self.checkpoint_search_dir = type(self).__name__
-        self.upsample = Keys.PIXELSHUFFLE
+        self.upsample = "pixelshuffle"
 
         self.image_channels = 5
         self.unet_channel_divider = 1
@@ -878,6 +879,9 @@ class LocalizerModule(TrainerMixin):
             upsample=self.upsample,
         )
 
+    def run_training(self):
+        self.run()
+
 
 class LocalizerOutputItem:
     def __init__(self):
@@ -914,3 +918,7 @@ class LocalizerOutputItem:
         self.loc_pred_delta = numpy_sigmoid(self.outputs.loc_output)
         indices = numpy.flatnonzero(self.label_pred == LocalizerEnum.FG)
         self.loc_pred = indices + self.loc_pred_delta[indices]
+
+
+if __name__ == '__main__':
+    LocalizerModule().run_training()
