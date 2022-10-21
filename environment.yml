@@ -33,7 +33,3 @@ dependencies:
   - biopython
   - numba
   - wandb
-  # - plotly
-  # - moviepy
-  # - cupy
-  # - tabulate
