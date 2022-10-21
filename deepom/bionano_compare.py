@@ -326,14 +326,19 @@ class BionanoCompare:
         self.read_result_xmap()
         self.bionano_items = list(self.bionano_alignment_items())
         print(f"{len(self.bionano_items)=}")
-        pickle_dump(self.output_file_base.with_suffix(".bionano.pickle"), self.bionano_items)
+        self.output_pickle_dump(self.bionano_items, ".bionano.pickle")
 
     def run_aligners(self):
         with self.executor:
             self.run_aligner()
-            pickle_dump(self.output_file_base.with_suffix(".aligner.pickle"), self.aligner_items)
+            self.output_pickle_dump(self.aligner_items, ".aligner.pickle")
             self.run_aligner_bnx()
-            pickle_dump(self.output_file_base.with_suffix(".aligner_bnx.pickle"), self.aligner_bnx_items)
+            self.output_pickle_dump(self.aligner_bnx_items, ".aligner_bnx.pickle")
+
+    def output_pickle_dump(self, obj, suffix):
+        file = self.output_file_base.with_suffix(suffix)
+        print(file)
+        pickle_dump(file, obj)
 
     def init_run(self):
         self.report.run_name = self.run_name
