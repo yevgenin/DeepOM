@@ -339,7 +339,6 @@ class BionanoCompare:
         self.read_cmap()
         self.make_refs()
         self.data_prep.make_crops()
-        # self.write_plot_crops()
         pickle_dump(self.output_file_base.with_suffix(".selected.pickle"), self.data_prep.selector.selected)
         pickle_dump(self.output_file_base.with_suffix(".crop_items.pickle"), self.data_prep.crop_items)
         self.data_prep.print_crops_report()
@@ -351,7 +350,7 @@ class BionanoCompare:
         print(self.output_file_base)
         self.output_file_base.with_suffix(".params.yml").write_text(yaml.dump(self.get_params()))
 
-    def run(self):
+    def run_bionano_compare(self):
         self.init_run()
         self.run_data_prep()
         self.run_aligners()
@@ -456,4 +455,4 @@ class BionanoCompareReport:
 
 
 if __name__ == '__main__':
-    BionanoCompare().run()
+    BionanoCompare().run_bionano_compare()
