@@ -60,19 +60,18 @@ class DataPrep:
 
         crop_size = int(crop_size_bp / self.nominal_scale)
 
-        if crop_size < image_len:
-            start = self.rng.integers(0, image_len - crop_size)
-            stop = start + crop_size
-            segment_image = segment_image[..., start: stop]
-            crop_lims = (start, stop)
-        else:
-            crop_lims = None
+        assert crop_size < image_len
+
+        start = self.rng.integers(0, image_len - crop_size)
+        stop = start + crop_size
+        segment_image = segment_image[..., start: stop]
+        crop_lims = (start, stop)
 
         crop = BNXItemCrop(
             parent_bnx_item=bnx_item, crop_lims=crop_lims, molecule_id=molecule_id
         )
         crop.crop_size_pixels = crop_size
-        crop.crop_size_bp = int(segment_image.shape[-1] * self.nominal_scale)
+        crop.crop_size_bp = crop_size_bp
         crop.segment_image = segment_image
         return crop
 
@@ -383,7 +382,7 @@ class BionanoCompareReport:
         self.bionano_items = None
 
     def read_compute_results(self):
-        file_base = Paths().out_file_mkdir("bionano_compare", self.run_name, self.run_name)
+        file_base = Paths().out_path("bionano_compare", self.run_name, self.run_name)
         self.aligner_items = pickle_load(file_base.with_suffix(".aligner.pickle"))
         try:
             self.aligner_bnx_items = pickle_load(file_base.with_suffix(".aligner_bnx.pickle"))
@@ -468,4 +467,5 @@ class BionanoCompareReport:
 
 
 if __name__ == '__main__':
-    BionanoCompare().run_bionano_compare()
+    BionanoCompare().run_bionano_compare_a()
+    BionanoCompare().run_bionano_compare_b()
