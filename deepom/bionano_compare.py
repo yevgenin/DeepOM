@@ -173,7 +173,7 @@ class BionanoCompare:
         self.result_xmap_file_data = xmap_file_data
 
     def localizer_qry_items(self):
-        self.localizer_module.checkpoint_search_dir = "LocalizerModule"
+        self.localizer_module.checkpoint_search_dir = Config.CHECKPOINT_SEARCH_DIR
         self.localizer_module.load_checkpoint = True
         self.localizer_module.init_ensure_module()
 

@@ -5,6 +5,11 @@ import numpy
 
 class Config:
     HOME_DIR = Path.home()
+    PROJECT_NAME = "OM"
+    OUT_DIR = "out"
+    DATA_DIR = "data"
+    LOCALIZER_TRAINING_OUTPUT_DIR = HOME_DIR / OUT_DIR / "LocalizerModule"
+    CHECKPOINT_SEARCH_DIR = HOME_DIR / OUT_DIR / "LocalizerModule/LocalizerModule-20220904-therapeutic-finch"
     REFALIGNER = HOME_DIR / "bionano_sw/tools/pipeline/Solve3.7_03302022_283/RefAligner/1.0/RefAligner"
     REF_CMAP_FILE = HOME_DIR / "data/bionano_data/refaligner_data/hg38_DLE1_0kb_0labels.cmap"
     BNXDB_FILE = HOME_DIR / "data/bionano_data/bnx.db"
@@ -27,9 +32,6 @@ class Config:
     KW_EVENTPLOT = {"lineoffsets": 0, "linelengths": .1}
     PROFILE_WIDTH = 17
     ALIGN_MAP_PLOT_SHAPE = 1000
-    PROJECT_NAME = "OM"
-    OUT_DIR = "out"
-    DATA_DIR = "data"
     HOME = Path.home()
     CHECKPOINT_FILE: str = "checkpoint.pickle"
     REFSEQ_T7 = "GCF_000844825.1"

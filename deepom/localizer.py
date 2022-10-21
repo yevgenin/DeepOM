@@ -603,6 +603,7 @@ class TrainerMixin(TaskMixin):
                 file = find_file(search_dir=search_dir, suffix=Config.CHECKPOINT_FILE)
             except (ValueError, RuntimeError):
                 print_exc()
+                raise
             else:
                 print('loading checkpoint: ', file, '\n\n')
                 self.module.load_state_dict(torch.load(file, map_location=self.device))
@@ -708,7 +709,7 @@ class LocalizerModule(TrainerMixin):
         self.divisible_size = 16
         self.min_spatial_size = 32
         self.load_checkpoint = False
-        self.checkpoint_search_dir = type(self).__name__
+        self.checkpoint_search_dir = Config.CHECKPOINT_SEARCH_DIR
         self.upsample = "pixelshuffle"
 
         self.image_channels = 5
@@ -735,11 +736,6 @@ class LocalizerModule(TrainerMixin):
 
     def init_task(self):
         super().init_task()
-
-    def run(self):
-        self.log_wandb_enable = True
-        self.batch_size = 256
-        super().run()
 
     def _resize_pad_or_crop_end(self, size):
         return Compose([
@@ -876,6 +872,10 @@ class LocalizerModule(TrainerMixin):
         )
 
     def run_training(self):
+        self.log_wandb_enable = True
+        self.batch_size = 256
+        self.checkpoint_search_dir = Config.CHECKPOINT_SEARCH_DIR
+        self.task_root_dir = Config.LOCALIZER_TRAINING_OUTPUT_DIR
         self.run()
 
 
