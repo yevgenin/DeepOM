@@ -70,7 +70,6 @@ class Aligner:
                 best_score = -numpy.inf
                 best_prev_node = None
 
-                #   replace with maxQskip, maxRskip?, limit by error margin
                 for q0 in range(max(0, q - dp_band_size), q):
                     delta_query = qvec[q] - qvec[q0]
                     skip_query = q - q0 - 1
