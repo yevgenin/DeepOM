@@ -143,6 +143,7 @@ class BionanoCompare:
     aligner_use_bnx_locs = False
     parallel = True
     bionano_ref_aligner_run_ids = numpy.arange(16) + 1
+    bionano_ref_aligner_top_mol_num = 8
 
     def __init__(self):
         self.cmap_file_data = BionanoFileData()
@@ -356,6 +357,7 @@ class BionanoCompare:
         self.run_aligners()
 
     def run_bionano_compare_b(self):
+        self.data_prep.selector.top_mol_num = self.bionano_ref_aligner_top_mol_num
         self.data_prep.selector.run_ids = self.bionano_ref_aligner_run_ids
         self.init_run()
         self.read_cmap()
@@ -449,17 +451,15 @@ class BionanoCompareReport:
         ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
 
         self.aligner_accuracy_items = list(self.accuracy_items(self.aligner_items))
-        if self.aligner_bnx_items is not None:
-            self.aligner_bnx_accuracy_items = list(self.accuracy_items(self.aligner_bnx_items))
-            self.aligner_accuracy = self.plot_accuracy(self.aligner_accuracy_items,
-                                                       label="DeepOM")
-            self.aligner_bnx_accuracy = self.plot_accuracy(self.aligner_bnx_accuracy_items,
-                                                           label="Bionano Localizer")
+        self.aligner_accuracy = self.plot_accuracy(self.aligner_accuracy_items, label="DeepOM")
+
+        if self.bionano_items is not None:
+            self.bionano_accuracy_items = list(self.accuracy_items(self.bionano_items))
+            self.bionano_accuracy = self.plot_accuracy(self.bionano_accuracy_items, label="Bionano Localizer + Aligner")
         else:
-            self.aligner_accuracy = self.plot_accuracy(self.aligner_accuracy_items, label="DeepOM")
-            if self.bionano_items is not None:
-                self.bionano_accuracy_items = list(self.accuracy_items(self.bionano_items))
-                self.bionano_accuracy = self.plot_accuracy(self.bionano_accuracy_items, label="Bionano")
+            self.aligner_bnx_accuracy_items = list(self.accuracy_items(self.aligner_bnx_items))
+            self.aligner_bnx_accuracy = self.plot_accuracy(self.aligner_bnx_accuracy_items,
+                                                           label="Bionano Localizer + DeepOM Aligner")
 
         pyplot.xlabel("Fragment Length (kb)")
         pyplot.ylabel("Success Rate")
