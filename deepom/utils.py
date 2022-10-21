@@ -303,3 +303,14 @@ def gaussian_density(coords, intensity, shape, sigma, truncate_sigmas=4):
     ind = numpy.ravel_multi_index((i, j), dims=shape)
     res = numpy.bincount(ind, weights=v, minlength=shape[0] * shape[1]).reshape(shape)
     return res
+
+
+def filter_valid_coords(coords, shape):
+    valid = (
+            (coords.T[0] >= 0) &
+            (coords.T[0] < shape[0]) &
+            (coords.T[1] >= 0) &
+            (coords.T[1] < shape[1])
+    )
+    coords = coords[valid, :]
+    return coords
