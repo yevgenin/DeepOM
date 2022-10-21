@@ -20,10 +20,8 @@ from monai.utils import convert_to_tensor, Method
 from numpy import ndarray
 from numpy.random import default_rng
 from scipy import ndimage
-from scipy.signal import find_peaks
 from scipy.stats import gamma
 from scipy.stats._distn_infrastructure import rv_generic
-from skimage import img_as_float
 from skimage.exposure import rescale_intensity
 from torch import Tensor
 from torch.optim import Adam
@@ -852,7 +850,6 @@ class LocalizerModule(TrainerMixin):
         ], dim=1)
 
         mask = (targets.label_target > 0).float()
-        #   todo: check zero mask
         mask_mean = mask.mean()
         assert mask_mean > 0
 
@@ -892,20 +889,6 @@ class LocalizerOutputItem:
         self.output_tensor = None
         self.label_pred = None
         self.outputs = None
-
-    def _locs(self, image: ndarray):
-        x = img_as_float(image)
-        x = ndimage.gaussian_filter(x, sigma=(1, 1), mode='constant')
-        c = image.shape[0] // 2
-        x = x[c]
-        x = (x - x.min()).clip(0, None)
-        mx = numpy.mean(x)
-        x = x / mx
-        peaks, _ = find_peaks(x, height=5)
-        # pyplot.plot(x, c='g')
-        # pyplot.eventplot(peaks)
-        # pyplot.show()
-        return peaks
 
     def make_pred(self, output_tensor):
         self.output_tensor = output_tensor
