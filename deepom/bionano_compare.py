@@ -75,6 +75,7 @@ class DataPrep:
         return crop
 
     def print_crops_report(self):
+        assert len(self.crop_items)
         df = DataFrame([
             {**vars(item), **item.bnx_item.bnx_record}
             for item in self.crop_items

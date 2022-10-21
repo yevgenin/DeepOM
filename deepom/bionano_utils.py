@@ -11,7 +11,6 @@ import pandas
 from matplotlib import pyplot
 from numpy import ndarray
 from pandas import DataFrame, Series
-from scipy.interpolate import interp1d
 from sqlalchemy import create_engine
 from tqdm.auto import tqdm
 
@@ -41,15 +40,6 @@ class XMAPItem:
         self.ref_lims = self.xmap_record[["RefStartPos", "RefEndPos"]].astype(float).sort_values().values
 
         self.scale = (self.ref_lims[1] - self.ref_lims[0]) / ((self.qry_lims[1] - self.qry_lims[0]) / self.bnx_scale)
-
-    def query_to_ref_interp(self, query_locs):
-        self.alignment_intep_func = interp1d(
-            self.qry_lims,
-            self.ref_lims,
-            fill_value="extrapolate"
-        )
-        ref_sites = self.alignment_intep_func(numpy.stack(query_locs)).astype(int)
-        return ref_sites
 
 
 class BionanoRefAlignerRun:
