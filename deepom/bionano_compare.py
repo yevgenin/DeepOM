@@ -35,7 +35,6 @@ class DataPrep:
 
     def make_crops(self):
         self.selector.select_molecules()
-        assert self.num_crops_per_size <= len(self.selector.selected)
 
         self.crop_sizes_bp = numpy.geomspace(*self.crop_size_range_bp, self.num_sizes)[::-1]
         print("crop_sizes", self.crop_sizes_bp)
@@ -43,7 +42,7 @@ class DataPrep:
         def _crop_items():
             molecule_ids = count(1)
             for crop_size_bp in self.crop_sizes_bp:
-                bnx_items = self.rng.choice(self.selector.selected, size=self.num_crops_per_size, replace=False)
+                bnx_items = self.rng.choice(self.selector.selected, size=self.num_crops_per_size, replace=True)
                 for bnx_item in bnx_items:
                     try:
                         yield self.generate_crop(bnx_item=bnx_item, molecule_id=next(molecule_ids),
