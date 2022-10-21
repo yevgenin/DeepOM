@@ -1,25 +1,22 @@
-#   DeepOM
+# DeepOM
 
-DeepOM is a python deep-learning software for Optical Mapping of DNA images to a genome reference.
+DeepOM is a Python deep-learning software for Optical Mapping of DNA images to a genome reference.
+See the [paper]() for details.
 
-#   Getting started
+# Installation
 
-See notebooks:
-DeepOM Figures Generation: 
-DeepOM Training:
-
-#   Paper
-
-This is the implementation of the [paper]().
-
-CITATION
-
-#   Acknowledgements
-
-#   Installation for development
-```
+```shell
 conda env create -f environment.yml
 conda activate deepom
 pip install -r requirements.txt
 pip install -e .
 ```
+
+# Getting started
+
+-   Reproducing the figures from the paper: See Jupyter notebooks in the [figures](figures/) dir.
+-   Running the localizer net training:
+    ```shell
+    conda activate deepom
+    python deepom/localizer.py
+    ```
