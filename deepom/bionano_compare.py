@@ -143,6 +143,7 @@ class BionanoCompare:
     cmap_filepath = "/home/ynogin/data/bionano_data/refaligner_data/hg38_DLE1_0kb_0labels.cmap"
     aligner_use_bnx_locs = False
     parallel = True
+    bionano_ref_aligner_run_ids = numpy.arange(16) + 1
 
     def __init__(self):
         self.cmap_file_data = BionanoFileData()
@@ -320,7 +321,7 @@ class BionanoCompare:
         self.aligner_bnx_items = list(self.aligner_alignment_items_top(self.bnx_qry_items()))
         print(f"{len(self.aligner_bnx_items)=}")
 
-    def run_bionano(self):
+    def run_bionano_refaligner(self):
         self.run_bionano_on_bnx()
         self.read_result_xmap()
         self.bionano_items = list(self.bionano_alignment_items())
@@ -329,20 +330,10 @@ class BionanoCompare:
 
     def run_aligners(self):
         with self.executor:
-            # self.executor.submit(self.run_bionano)
             self.run_aligner()
             pickle_dump(self.output_file_base.with_suffix(".aligner.pickle"), self.aligner_items)
             self.run_aligner_bnx()
             pickle_dump(self.output_file_base.with_suffix(".aligner_bnx.pickle"), self.aligner_bnx_items)
-
-    def run_data_prep(self):
-        self.read_cmap()
-        self.make_refs()
-        self.data_prep.make_crops()
-        pickle_dump(self.output_file_base.with_suffix(".selected.pickle"), self.data_prep.selector.selected)
-        pickle_dump(self.output_file_base.with_suffix(".crop_items.pickle"), self.data_prep.crop_items)
-        self.data_prep.print_crops_report()
-        self.data_prep.make_crops_bnx()
 
     def init_run(self):
         self.report.run_name = self.run_name
@@ -352,7 +343,19 @@ class BionanoCompare:
 
     def run_bionano_compare(self):
         self.init_run()
-        self.run_data_prep()
+        self.read_cmap()
+        self.make_refs()
+
+        self.data_prep.selector.run_ids = self.bionano_ref_aligner_run_ids
+        self.data_prep.make_crops()
+        self.data_prep.print_crops_report()
+        self.data_prep.make_crops_bnx()
+        self.data_prep.crop_items = []
+        self.run_bionano_refaligner()
+
+        self.data_prep.selector.run_ids = None
+        self.data_prep.make_crops()
+        self.data_prep.print_crops_report()
         self.run_aligners()
 
     def get_params(self):

@@ -680,7 +680,7 @@ def git_commit(confirm=True):
         return
 
     if repo.is_dirty():
-        if not confirm or click.confirm('commit?', default=True):
+        if not confirm or click.confirm('do git commit?', default=True):
             repo.git.commit('-am', '.')
 
     return str(repo.head.object)

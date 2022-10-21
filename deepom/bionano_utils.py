@@ -217,10 +217,6 @@ class MoleculeSelector:
         self.read_files()
         xmap_df = self.xmap_file_data.file_df
 
-        #
-        # if self.min_confidence is not None:
-        #     xmap_df = xmap_df[xmap_df["Confidence"].astype(float) >= self.min_confidence]
-        #
         if self.min_qry_len is not None:
             xmap_df = xmap_df[xmap_df["QryLen"].astype(float) >= self.min_qry_len]
 
