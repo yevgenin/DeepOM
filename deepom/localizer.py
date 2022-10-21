@@ -663,9 +663,8 @@ class TrainerMixin(TaskMixin):
 
 
 class SimulatedGenomeItem:
-    rng = default_rng()
-
     def __init__(self):
+        self.rng = default_rng()
         self.sitevec = None
         self.genome_len = None
         self.sparsity = None

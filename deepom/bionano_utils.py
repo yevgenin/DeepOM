@@ -325,6 +325,8 @@ class BNXItemCrop:
         self.molecule_id = molecule_id
 
         self.original_locs_crop = locs = self.parent_bnx_item.locs
+        assert is_sorted(locs)
+
         QX11_values = parse_bionano_file_line(self.parent_bnx_item.bnx_record["QX11"])[1:]
         QX12_values = parse_bionano_file_line(self.parent_bnx_item.bnx_record["QX12"])[1:]
         Length = self.parent_bnx_item.bnx_record["Length"]
@@ -333,7 +335,6 @@ class BNXItemCrop:
             self.crop_bnx_lims = numpy.stack(self.crop_lims) * self.bnx_scale
 
             assert len(locs) >= self.min_locs
-            assert is_sorted(locs)
 
             slice_start, slice_stop = locs.searchsorted(self.crop_bnx_lims)
 
@@ -343,6 +344,8 @@ class BNXItemCrop:
 
             locs = locs - self.crop_bnx_lims[0]
             Length = self.crop_bnx_lims[1] - self.crop_bnx_lims[0]
+        else:
+            self.crop_bnx_lims = locs[[0, -1]]
 
         assert len(locs) >= self.min_locs
 
