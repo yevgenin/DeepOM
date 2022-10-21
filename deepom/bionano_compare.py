@@ -350,8 +350,8 @@ class BionanoCompare:
         self.data_prep.make_crops()
         self.data_prep.print_crops_report()
         self.data_prep.make_crops_bnx()
-        self.data_prep.crop_items = []
         self.run_bionano_refaligner()
+        self.data_prep.crop_items = []
 
         self.data_prep.selector.run_ids = None
         self.data_prep.make_crops()
