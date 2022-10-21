@@ -44,7 +44,7 @@ from torch.utils.data import Dataset, IterableDataset
 from tqdm.auto import tqdm
 from nd2reader import ND2Reader
 
-from om_decoder.config import Config
+from deepom.config import Config
 
 sqrt2pi = math.sqrt(2 * math.pi)
 T = TypeVar('T')
@@ -81,6 +81,7 @@ def segment_iou(seg1, seg2):
     intersection = max(0, min(b, y) - max(a, x))
     iou = intersection / union
     return iou
+
 
 def set_ax_bp_format(ax=None, which='x', places=3, base=None, unit='b'):
     if ax is None:
