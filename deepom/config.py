@@ -2,6 +2,12 @@ from pathlib import Path
 
 
 class Config:
+    REFALIGNER = "/home/ynogin/bionano_sw/tools/pipeline/Solve3.7_03302022_283/RefAligner/1.0/RefAligner"
+    REF_CMAP_FILE = "/home/ynogin/data/bionano_data/refaligner_data/hg38_DLE1_0kb_0labels.cmap"
+    BNXDB_FILE = "/home/ynogin/data/bionano_data/bnx.db"
+    BNX_FILE = "/home/ynogin/data/bionano_data/bionano_run_data/T1_chip2_channels_swapped.bnx"
+    BIONANO_JXR_DIR = "/home/ynogin/mnt/Q/Yevgeni/bionano_jxr/"
+    XMAP_FILE = "/home/ynogin/data/bionano_data/bionano_run_data/exp_refineFinal1.xmap"
     BIONANO_BNX_SCALE = 375
     BIONANO_NOMINAL_SCALE = 335
     NM_PER_BP_NOMINAL = 0.34

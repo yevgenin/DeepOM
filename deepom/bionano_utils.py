@@ -54,8 +54,8 @@ class XMAPItem:
 
 class BionanoRefAlignerRun:
     bnx_text: str
-    ref_file: str = "/home/ynogin/data/bionano_data/refaligner_data/hg38_DLE1_0kb_0labels.cmap"
-    refaligner_exe = "/home/ynogin/bionano_sw/tools/pipeline/Solve3.7_03302022_283/RefAligner/1.0/RefAligner"
+    ref_file: str = Config.REF_CMAP_FILE
+    refaligner_exe = Config.REFALIGNER
     """    
     -T <Pvalue> : only use alignments with Pvalue below this threshold [Default 0.0001]
     -A <Aligned-Sites> : only use alignments with at least this many sites [Default 8]
@@ -71,7 +71,7 @@ class BionanoRefAlignerRun:
     -res <r> : r is Resolution in pixels, one value per color [Default 3.5] : NOTE : Depends on bpp value
     -resSD <rs> : rs is standard deviation of resolution in pixels, one value per color [Default 0.75] : NOTE : Depends on bpp value
     """
-    options = "-f -BestRef 1 -usecolor 1 -A 2 -T 1 -S -1000"  # -FP 2.0 -FN 0.10 -sf 0.25 -sd 0.11 -sr 0.03 -res 3.1 -nosplit 2"
+    options = "-f -BestRef 1 -usecolor 1 -A 2 -T 1 -S -1000"
 
     def run_refaligner(self):
         self.run_name = timestamp_str_iso_8601()
@@ -185,8 +185,8 @@ class BionanoImage:
 
 
 class MoleculeSelector:
-    xmap_file = "/home/ynogin/data/bionano_data/bionano_run_data/exp_refineFinal1.xmap"
-    jxr_root = "/home/ynogin/mnt/Q/Yevgeni/bionano_jxr/"
+    xmap_file = Config.XMAP_FILE
+    jxr_root = Config.BIONANO_JXR_DIR
     xmap_file_data: 'BionanoFileData'
     bnx_file_data: 'BNXFileData'
     top_mol_num: int = 512
@@ -384,8 +384,8 @@ class BNXItemCrop:
 
 
 class BNXFileData:
-    bnx_file: str = "/home/ynogin/data/bionano_data/bionano_run_data/T1_chip2_channels_swapped.bnx"
-    db_file = "/home/ynogin/data/bionano_data/bnx.db"
+    bnx_file: str = Config.BNX_FILE
+    db_file = Config.BNXDB_FILE
     block_size = 7
     chunk_size = 10 ** 4
     index_name = "MoleculeID"

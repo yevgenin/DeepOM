@@ -138,7 +138,7 @@ class AccuracyItem:
 
 class BionanoCompare:
     nominal_scale = Config.BIONANO_NOMINAL_SCALE
-    cmap_filepath = "/home/ynogin/data/bionano_data/refaligner_data/hg38_DLE1_0kb_0labels.cmap"
+    cmap_filepath = Config.REF_CMAP_FILE
     aligner_use_bnx_locs = False
     parallel = True
     bionano_ref_aligner_run_ids = numpy.arange(16) + 1
