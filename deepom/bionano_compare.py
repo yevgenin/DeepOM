@@ -13,7 +13,7 @@ from numpy.random import default_rng
 from pandas import Series, DataFrame
 from tqdm.auto import tqdm
 
-from deepom.aligner import SpAligner
+from deepom.aligner import Aligner
 from deepom.bionano_utils import XMAPItem, BionanoRefAlignerRun, MoleculeSelector, BNXItemCrop, BionanoFileData
 from deepom.localizer import LocalizerModule, LocalizerOutputItem
 from deepom.utils import Config, Paths, asdict_recursive, nested_dict_filter_types, pickle_dump, \
@@ -141,7 +141,7 @@ class AccuracyItem:
 class BionanoCompare:
     nominal_scale = Config.BIONANO_NOMINAL_SCALE
     cmap_filepath = "/home/ynogin/data/bionano_data/refaligner_data/hg38_DLE1_0kb_0labels.cmap"
-    spaligner_use_bnx_locs = False
+    aligner_use_bnx_locs = False
     parallel = True
 
     def __init__(self):
@@ -220,7 +220,7 @@ class BionanoCompare:
             yield _qry_item(orientation="+", locs=crop_item.original_locs_crop - crop_item.crop_bnx_lims[0])
             yield _qry_item(orientation="-", locs=numpy.sort(crop_item.crop_bnx_lims[1] - crop_item.original_locs_crop))
 
-    def spaligner_alignment_items(self, qry_items):
+    def aligner_alignment_items(self, qry_items):
         tasks = []
 
         for qry_item in tqdm(qry_items, desc="qry items", total=len(self.data_prep.crop_items) * 2):
@@ -242,7 +242,7 @@ class BionanoCompare:
                     pass
 
     def align(self, qry_item, ref, ref_id):
-        aligner = SpAligner()
+        aligner = Aligner()
         aligner.align_params = {}
         aligner.make_alignment(qry=qry_item.qry, ref=ref)
         alignment_item = AlignmentItem()
@@ -266,8 +266,8 @@ class BionanoCompare:
             for ref_id, ref_df in self.cmap_file_data.file_df.groupby("CMapId")
         })
 
-    def spaligner_alignment_items_top(self, qry_items):
-        items = self.spaligner_alignment_items(qry_items)
+    def aligner_alignment_items_top(self, qry_items):
+        items = self.aligner_alignment_items(qry_items)
         alignment_df = DataFrame(map(vars, items))
 
         yield from (
@@ -312,13 +312,13 @@ class BionanoCompare:
             alignment_item.alignment_item = alignment_item
             yield alignment_item
 
-    def run_spaligner(self):
-        self.spaligner_items = list(self.spaligner_alignment_items_top(self.localizer_qry_items()))
-        print(f"{len(self.spaligner_items)=}")
+    def run_aligner(self):
+        self.aligner_items = list(self.aligner_alignment_items_top(self.localizer_qry_items()))
+        print(f"{len(self.aligner_items)=}")
 
-    def run_spaligner_bnx(self):
-        self.spaligner_bnx_items = list(self.spaligner_alignment_items_top(self.bnx_qry_items()))
-        print(f"{len(self.spaligner_bnx_items)=}")
+    def run_aligner_bnx(self):
+        self.aligner_bnx_items = list(self.aligner_alignment_items_top(self.bnx_qry_items()))
+        print(f"{len(self.aligner_bnx_items)=}")
 
     def run_bionano(self):
         self.run_bionano_on_bnx()
@@ -330,10 +330,10 @@ class BionanoCompare:
     def run_aligners(self):
         with self.executor:
             # self.executor.submit(self.run_bionano)
-            self.run_spaligner()
-            pickle_dump(self.output_file_base.with_suffix(".spaligner.pickle"), self.spaligner_items)
-            self.run_spaligner_bnx()
-            pickle_dump(self.output_file_base.with_suffix(".spaligner_bnx.pickle"), self.spaligner_bnx_items)
+            self.run_aligner()
+            pickle_dump(self.output_file_base.with_suffix(".aligner.pickle"), self.aligner_items)
+            self.run_aligner_bnx()
+            pickle_dump(self.output_file_base.with_suffix(".aligner_bnx.pickle"), self.aligner_bnx_items)
 
     def run_data_prep(self):
         self.read_cmap()
@@ -355,7 +355,6 @@ class BionanoCompare:
         self.init_run()
         self.run_data_prep()
         self.run_aligners()
-        self.report.plot_results()
 
     def get_params(self):
         params = asdict_recursive(self, include_modules=[self.__module__])
@@ -368,46 +367,14 @@ class BionanoCompareReport:
     confidence_alpha = 0.05
 
     def __init__(self):
-        self.spaligner_bnx_items = None
+        self.aligner_bnx_items = None
         self.bionano_items = None
-
-    def plot_results(self):
-        self.read_compute_results()
-        self.compute_accuracy()
-        self.plot_compare()
-        self.write_report()
-
-    def read_report(self):
-        self.output_file_base = BionanoCompare.get_output_file_base(self.run_name)
-        return pandas.read_csv(self.output_file_base.with_suffix(".csv"))
-
-    def write_report(self):
-        pyplot.tight_layout()
-        self.output_file_base = BionanoCompare.get_output_file_base(self.run_name)
-        figure_file = self.output_file_base.with_suffix(".png")
-        print(figure_file)
-
-        pyplot.savefig(figure_file)
-
-        # df = self.spaligner_accuracy.to_frame("spaligner_accuracy")
-        # df["bionano_accuracy"] = self.bionano_accuracy
-        # df.to_csv(self.output_file_base.with_suffix(".csv"))
-
-    def write_plot_crops(self):
-        self.output_file_base = BionanoCompare.get_output_file_base(self.run_name)
-        for i, crop_item in enumerate(tqdm(self.data_prep.crop_items, desc="plot crops")):
-            crop_item.plot_crop()
-            figure_file = (self.output_file_base.parent / "crops" / str(i)).with_suffix(".jpg")
-            figure_file = Paths().out_file_mkdir(figure_file)
-            pyplot.title(crop_item.molecule_id)
-            pyplot.savefig(figure_file)
-            pyplot.close()
 
     def read_compute_results(self):
         file_base = Paths().out_file_mkdir("bionano_compare", self.run_name, self.run_name)
-        self.spaligner_items = pickle_load(file_base.with_suffix(".spaligner.pickle"))
+        self.aligner_items = pickle_load(file_base.with_suffix(".aligner.pickle"))
         try:
-            self.spaligner_bnx_items = pickle_load(file_base.with_suffix(".spaligner_bnx.pickle"))
+            self.aligner_bnx_items = pickle_load(file_base.with_suffix(".aligner_bnx.pickle"))
         except FileNotFoundError:
             pass
         try:
@@ -466,26 +433,19 @@ class BionanoCompareReport:
         return acc
 
     def plot_compare(self):
-        # pyplot.figure(figsize=(8, 5), dpi=400, facecolor="w")
         ax = pyplot.gca()
-        #
-        # ax.xaxis.set_major_locator(matplotlib.ticker.MultipleLocator(20000))
-        # ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, y: int(x // 1000)))
-        #
         ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(.1))
         ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
-        #
-        # pyplot.grid()
 
-        self.spaligner_accuracy_items = list(self.accuracy_items(self.spaligner_items))
-        if self.spaligner_bnx_items is not None:
-            self.spaligner_bnx_accuracy_items = list(self.accuracy_items(self.spaligner_bnx_items))
-            self.spaligner_accuracy = self.plot_accuracy(self.spaligner_accuracy_items,
-                                                         label="DeepOM")
-            self.spaligner_bnx_accuracy = self.plot_accuracy(self.spaligner_bnx_accuracy_items,
-                                                             label="Bionano Localizer")
+        self.aligner_accuracy_items = list(self.accuracy_items(self.aligner_items))
+        if self.aligner_bnx_items is not None:
+            self.aligner_bnx_accuracy_items = list(self.accuracy_items(self.aligner_bnx_items))
+            self.aligner_accuracy = self.plot_accuracy(self.aligner_accuracy_items,
+                                                       label="DeepOM")
+            self.aligner_bnx_accuracy = self.plot_accuracy(self.aligner_bnx_accuracy_items,
+                                                           label="Bionano Localizer")
         else:
-            self.spaligner_accuracy = self.plot_accuracy(self.spaligner_accuracy_items, label="DeepOM")
+            self.aligner_accuracy = self.plot_accuracy(self.aligner_accuracy_items, label="DeepOM")
             if self.bionano_items is not None:
                 self.bionano_accuracy_items = list(self.accuracy_items(self.bionano_items))
                 self.bionano_accuracy = self.plot_accuracy(self.bionano_accuracy_items, label="Bionano")

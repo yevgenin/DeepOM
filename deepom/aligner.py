@@ -5,7 +5,7 @@ from numpy import ndarray
 from deepom.utils import is_sorted, ndargmax
 
 
-class SpAligner:
+class Aligner:
     score_matrix: ndarray = None
     prev_matrix: ndarray = None
 
