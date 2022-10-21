@@ -341,21 +341,26 @@ class BionanoCompare:
         print(self.output_file_base)
         self.output_file_base.with_suffix(".params.yml").write_text(yaml.dump(self.get_params()))
 
-    def run_bionano_compare(self):
+    def run_bionano_compare_a(self):
         self.init_run()
         self.read_cmap()
         self.make_refs()
 
+        self.data_prep.selector.run_ids = None
+        self.data_prep.make_crops()
+        self.data_prep.print_crops_report()
+        self.run_aligners()
+
+    def run_bionano_compare_b(self):
         self.data_prep.selector.run_ids = self.bionano_ref_aligner_run_ids
+        self.init_run()
+        self.read_cmap()
+        self.make_refs()
+
         self.data_prep.make_crops()
         self.data_prep.print_crops_report()
         self.data_prep.make_crops_bnx()
         self.run_bionano_refaligner()
-        self.data_prep.crop_items = []
-
-        self.data_prep.selector.run_ids = None
-        self.data_prep.make_crops()
-        self.data_prep.print_crops_report()
         self.run_aligners()
 
     def get_params(self):
