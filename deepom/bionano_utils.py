@@ -179,10 +179,10 @@ class MoleculeSelector:
     jxr_root = Config.BIONANO_JXR_DIR
     xmap_file_data: 'BionanoFileData'
     bnx_file_data: 'BNXFileData'
-    top_mol_num: int = 512
+    top_mol_num: int = 128
     top_mols_by: str = "Confidence"
     same_fov = True
-    min_qry_len = 450 * 1000
+    min_qry_len = 500 * 1000
 
     molecule_ids = None
     min_len = None

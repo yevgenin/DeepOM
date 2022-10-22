@@ -21,7 +21,7 @@ from deepom.utils import Config, Paths, asdict_recursive, nested_dict_filter_typ
 
 
 class DataPrep:
-    crop_size_range_bp = 10 * 1000, 450 * 1000
+    crop_size_range_bp = 10 * 1000, 500 * 1000
     num_crops_per_size = 512
     num_sizes = 24
     nominal_scale = Config.BIONANO_NOMINAL_SCALE
@@ -376,14 +376,16 @@ class BionanoCompare:
 class BionanoCompareReport:
     run_name: str
     confidence_alpha = 0.05
-
-    def __init__(self):
-        self.aligner_bnx_items = None
-        self.bionano_items = None
+    aligner_items = None
+    aligner_bnx_items = None
+    bionano_items = None
 
     def read_compute_results(self):
         file_base = Paths().out_path("bionano_compare", self.run_name, self.run_name)
-        self.aligner_items = pickle_load(file_base.with_suffix(".aligner.pickle"))
+        try:
+            self.aligner_items = pickle_load(file_base.with_suffix(".aligner.pickle"))
+        except FileNotFoundError:
+            pass
         try:
             self.aligner_bnx_items = pickle_load(file_base.with_suffix(".aligner_bnx.pickle"))
         except FileNotFoundError:
@@ -397,8 +399,8 @@ class BionanoCompareReport:
         (x, y), (a, b) = sorted(parent_seg), sorted(crop_seg)
         assert (a < b) and (x < y)
         intersection = max(0, min(b, y) - max(a, x))
-        iou = intersection / (b - a)
-        return iou
+        overlap = intersection / (b - a)
+        return overlap
 
     def accuracy_items(self, alignment_items):
         alignment_item: AlignmentItem
@@ -448,8 +450,9 @@ class BionanoCompareReport:
         ax.yaxis.set_major_locator(matplotlib.ticker.MultipleLocator(.1))
         ax.yaxis.set_major_formatter(PercentFormatter(xmax=1))
 
-        self.aligner_accuracy_items = list(self.accuracy_items(self.aligner_items))
-        self.aligner_accuracy = self.plot_accuracy(self.aligner_accuracy_items, label="DeepOM")
+        if self.aligner_items is not None:
+            self.aligner_accuracy_items = list(self.accuracy_items(self.aligner_items))
+            self.aligner_accuracy = self.plot_accuracy(self.aligner_accuracy_items, label="DeepOM")
 
         if self.bionano_items is not None:
             self.bionano_accuracy_items = list(self.accuracy_items(self.bionano_items))
@@ -462,8 +465,15 @@ class BionanoCompareReport:
         pyplot.xlabel("Fragment Length (kb)")
         pyplot.ylabel("Success Rate")
         pyplot.legend()
+        
+        pyplot.xscale("log")
+        ax.xaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda x, y: int(x // 1000)))
+        ax.xaxis.set_minor_locator(matplotlib.ticker.MultipleLocator(10000))
+        ax.xaxis.set_minor_formatter(matplotlib.ticker.NullFormatter())
+        pyplot.grid(which="both")
+        pyplot.xticks(numpy.stack([20, 50, 100, 200, 400]) * 1000)
 
 
 if __name__ == '__main__':
-    # BionanoCompare().run_bionano_compare_a()
+    BionanoCompare().run_bionano_compare_a()
     BionanoCompare().run_bionano_compare_b()
