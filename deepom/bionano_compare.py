@@ -21,7 +21,7 @@ from deepom.utils import Config, Paths, asdict_recursive, nested_dict_filter_typ
 
 
 class DataPrep:
-    crop_size_range_bp = 15 * 1000, 450 * 1000
+    crop_size_range_bp = 10 * 1000, 450 * 1000
     num_crops_per_size = 512
     num_sizes = 24
     nominal_scale = Config.BIONANO_NOMINAL_SCALE
@@ -142,9 +142,7 @@ class BionanoCompare:
     cmap_filepath = Config.REF_CMAP_FILE
     aligner_use_bnx_locs = False
     parallel = True
-    bionano_ref_aligner_run_ids = numpy.arange(16) + 1
-    bionano_ref_aligner_top_mol_num = 8
-
+    
     def __init__(self):
         self.cmap_file_data = BionanoFileData()
         self.bionano_ref_aligner_run = BionanoRefAlignerRun()
@@ -357,8 +355,8 @@ class BionanoCompare:
         self.run_aligners()
 
     def run_bionano_compare_b(self):
-        self.data_prep.selector.top_mol_num = self.bionano_ref_aligner_top_mol_num
-        self.data_prep.selector.run_ids = self.bionano_ref_aligner_run_ids
+        self.data_prep.selector.top_mol_num = 8
+        self.data_prep.selector.run_ids = numpy.arange(8) + 1
         self.init_run()
         self.read_cmap()
         self.make_refs()
@@ -467,5 +465,5 @@ class BionanoCompareReport:
 
 
 if __name__ == '__main__':
-    BionanoCompare().run_bionano_compare_a()
+    # BionanoCompare().run_bionano_compare_a()
     BionanoCompare().run_bionano_compare_b()
