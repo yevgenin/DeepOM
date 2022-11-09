@@ -26,7 +26,7 @@ class Config:
     WANDB_PREFIX = "wandb_"
     TEST_DIR = "test"
     LOCALIZER_TRAINING_OUTPUT_DIR = OUT_DIR / "LocalizerModule"
-    CHECKPOINT_SEARCH_DIR = OUT_DIR / "LocalizerModule/LocalizerModule-20220904-therapeutic-finch"
+    CHECKPOINT_SEARCH_DIR = Path(__file__).parent.parent / "data/pretrained"
     CHECKPOINT_FILE: str = "checkpoint.pickle"
 
 
