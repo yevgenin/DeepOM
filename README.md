@@ -20,3 +20,8 @@ pip install -e .
     conda activate deepom
     python deepom/localizer.py
     ```
+-   Running the benchmark:
+    ```
+    conda activate deepom
+    python deepom/bionano_compare.py
+    ```
