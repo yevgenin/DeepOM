@@ -1,1 +1,4 @@
 matplotlib_scalebar
+napari
+coolname
+sqlalchemy
