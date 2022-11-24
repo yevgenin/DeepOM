@@ -224,6 +224,8 @@ class SimulatedDataItem(DataItem):
         if self.bg_distrib is not None:
             self.image_bg = self.random_sample(self.bg_distrib, size=self.image_fg.shape)
             self.image = rescale_intensity(self.image_fg + self.image_bg)
+        else:
+            self.image = self.image_fg
 
     def make_stray_coords(self):
         assert self.lat_size
