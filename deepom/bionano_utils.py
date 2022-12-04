@@ -439,6 +439,7 @@ class BNXFileData:
         return df
 
     def _sql_engine(self):
+        print("reading: ", self.db_file)
         engine = create_engine(f'sqlite:///{self.db_file}', echo=False)
         return engine
 
