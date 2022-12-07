@@ -373,7 +373,7 @@ class TrainerMixin(TaskMixin):
         self.checkpoint_search_dir = None
         self.log_metrics_every = 1
 
-        self.device = torch.device('cuda')
+        self.device = torch.device('cpu')
         self.dtype = torch.float32
         self.lr = 1e-3
         self.batch_size = 1

@@ -22,14 +22,17 @@ from deepom.utils import Config, Paths, asdict_recursive, nested_dict_filter_typ
 
 
 class DataPrep:
-    crop_size_range_bp = 10 * 1000, 450 * 1000
-    num_crops_per_size = 512
-    num_sizes = 24
+    # crop_size_range_bp = 10 * 1000, 450 * 1000
+    # num_crops_per_size = 512
+    # num_sizes = 24
     nominal_scale = Config.BIONANO_NOMINAL_SCALE
 
-    def __init__(self):
+    def __init__(self, crop_size_range_bp = (10 * 1000, 450 * 1000), num_crops_per_size=512,  num_sizes = 24):
         self.rng = default_rng(seed=0)
         self.selector = MoleculeSelector()
+        self.crop_size_range_bp = crop_size_range_bp
+        self.num_crops_per_size = num_crops_per_size
+        self.num_sizes = num_sizes
 
     def crops_df(self):
         return DataFrame(map(vars, self.crop_items))
