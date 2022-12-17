@@ -4,7 +4,8 @@ from scipy.interpolate import interp1d
 from deepom.bionano_utils import MoleculeSelector
 
 from deepom.config import Config
-from deepom.localizer import LocalizerModule, LocalizerEnum
+from deepom.localizer import LocalizerModule
+from deepom.common_types import LocalizerEnum
 import monai
 
 from deepom.aligner import Aligner
@@ -18,41 +19,6 @@ from deepom.config import Config
 from threading import Lock, Thread
 from pathlib import Path
 
-class SingletonMeta(type):
-    """
-    This is a thread-safe implementation of Singleton.
-    """
-
-    _instances = {}
-
-    _lock: Lock = Lock()
-    """
-    We now have a lock object that will be used to synchronize threads during
-    first access to the Singleton.
-    """
-
-    def __call__(cls, *args, **kwargs):
-        """
-        Possible changes to the value of the `__init__` argument do not affect
-        the returned instance.
-        """
-        # Now, imagine that the program has just been launched. Since there's no
-        # Singleton instance yet, multiple threads can simultaneously pass the
-        # previous conditional and reach this point almost at the same time. The
-        # first of them will acquire lock and will proceed further, while the
-        # rest will wait here.
-        with cls._lock:
-            # The first thread to acquire the lock, reaches this conditional,
-            # goes inside and creates the Singleton instance. Once it leaves the
-            # lock block, a thread that might have been waiting for the lock
-            # release may then enter this section. But since the Singleton field
-            # is already initialized, the thread won't create a new object.
-            if cls not in cls._instances:
-                instance = super().__call__(*args, **kwargs)
-                cls._instances[cls] = instance
-        return cls._instances[cls]
-    
-    
 class DataFetcher():
     
     def __init__(self, num_molecules: int,plot_size = 500):
@@ -148,7 +114,7 @@ class DataFetcher():
             aligner = self.get_best_aligner(inference_item,molecule_index)
             ground_truth = self.interpolate_ground_truth(aligner,molecule_index)
             self.save_ground_truth_plot(inference_item,ground_truth,molecule_index)
-            print(f"generated molecule number {molecule_index}")
+            # print(f"generated molecule number {molecule_index}")
             
     def generate_ground_truth(self, molecule_index):
         self.get_molecules_from_file()
@@ -170,7 +136,7 @@ class DataFetcher():
        
         a[labeled_index] = LocalizerEnum.FG
         b[labeled_index] = pos_in_pixel
-         
+        # print(f"GT for mol number {molecule_index}: is of length {shape}")
         return mol,a,b
        
             
@@ -196,17 +162,5 @@ class DataFetcher():
         return overlap_percentage(self.selector.selected[mol_index].xmap_item.ref_lims, aligner.alignment_ref[[0, -1]])
     
 
-
-
-
-
-# class Singleton(metaclass=SingletonMeta):
-#     value: str = None
-#     """
-#     We'll use this property to prove that our Singleton really works.
-#     """
-
-#     def __init__(self, value: str) -> None:
-#         self.value = value
         
     

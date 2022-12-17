@@ -668,10 +668,11 @@ class LocalizerModule(TrainerMixin):
 
     def inference_item(self, segment_3d):
         image_input = self.image_input(segment_3d)
+        # print("original image input shape"+ str(image_input.shape[-1:]))
 
         with inference_eval(self.module):
             output_tensor = self._inference_forward(image_input)
-
+           
         item = copy(self.module_output_item)
         item.image = segment_3d
         item.image_input = image_input

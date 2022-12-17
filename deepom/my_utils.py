@@ -3,9 +3,10 @@ from deepom.aligner import Aligner
 import numpy
 from numba import njit
 from numpy import ndarray
-
+import torch
 from deepom.utils import is_sorted, ndargmax
-
+import logging
+import sys
 
 def get_aligner():
     aligner = Aligner()
@@ -42,10 +43,39 @@ def overlap_percentage(xlist,ylist):
     return 2*overlap/length
     
 
-def generateGroundTruth(mol):
-    pass
+
+
+'''
+Loss functions and Neural Network Related Utils
+'''
+def dice_loss(y_pred,y_true):
+    return 1 - dice_coef(y_pred,y_true)
+
+def dice_coef(y_pred,y_true, smooth=1e-5):
+    y_true_f = torch.flatten(y_true)
+    y_pred_f = torch.flatten(y_pred)
+    intersection = torch.sum(y_true_f * y_pred_f)
+    dice = (2. * intersection + smooth) / (torch.sum(y_true_f) + torch.sum(y_pred_f) + smooth)
+    return dice
+
+
+
+'''
+Logger meta class
+'''
 
 
 
 
 
+class MetaBase(type):
+    def __init__(cls, *args):
+        super().__init__(*args)
+
+        # Explicit name mangling
+        logger_attribute_name = '_' + cls.__name__ + '__logger'
+
+        # Logger name derived accounting for inheritance for the bonus marks
+        logger_name = '.'.join([c.__name__ for c in cls.mro()[-2::-1]])
+
+        setattr(cls, logger_attribute_name, logging.getLogger(logger_name))

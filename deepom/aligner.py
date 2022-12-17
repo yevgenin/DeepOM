@@ -52,10 +52,10 @@ class Aligner:
             loc_factor: float = 500,
             skip_r_factor: float = 10,
             skip_q_factor: float = 10,
-            dp_band_size: int = 5
+            dp_band_size: int = 5,
     ):
         assert 2 <= len(rvec) <= 10 ** 9
-        assert 2 <= len(qvec) <= 200
+        assert 2 <= len(qvec) <= 1000
 
         len_r = len(rvec)
         len_q = len(qvec)
