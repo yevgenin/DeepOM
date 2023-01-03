@@ -230,7 +230,9 @@ def is_sorted(a):
 
 
 def numpy_sigmoid(x):
-    return torch.sigmoid(torch.from_numpy(x)).numpy()
+    if not isinstance(x, torch.Tensor):
+        x = torch.from_numpy(x)
+    return torch.sigmoid(x).numpy()
 
 
 def set_names(cls):
