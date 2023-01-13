@@ -561,7 +561,7 @@ class LocalizerOutputs(NamedTuple):
 
 
 class LocalizerModule(TrainerMixin):
-    def __init__(self):
+    def __init__(self, sparsity = 4 ** 6, nominal_num_labels_fragment = 16):
         super().__init__()
         self.divisible_size = 16
         self.min_spatial_size = 32
@@ -574,13 +574,11 @@ class LocalizerModule(TrainerMixin):
         self.out_channels = len(LocalizerOutputs.__annotations__)
 
         self.image_data = LocalizerTrainDataItem()
-        sparsity = 4 ** 6
         self.nominal_scale = self.image_data.nominal_scale
 
         self.module_output_item = LocalizerOutputItem()
         self.module_output_item.nominal_scale = self.nominal_scale
 
-        nominal_num_labels_fragment = 16
         nominal_fragment_len = sparsity * nominal_num_labels_fragment
         self.image_data.fragment_len = nominal_fragment_len
 
