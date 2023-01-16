@@ -1,13 +1,12 @@
 name: deepom
 channels:
   - pytorch
+  - nvidia
   - defaults
   - conda-forge
 
 dependencies:
-  - python=3.9
-  - pytorch
-  - cudatoolkit=11.3
+  - pytorch-cuda=11.6
   - monai
   - fire
   - jupyter

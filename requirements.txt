@@ -2,3 +2,4 @@ matplotlib_scalebar
 napari
 coolname
 sqlalchemy
+# ~/MATLAB/R2022b/extern/engines/python/
