@@ -1,6 +1,8 @@
+import coolname
+import imageio
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from itertools import count
-
+from skimage import img_as_uint
 from matplotlib.ticker import PercentFormatter
 from statsmodels.stats.proportion import proportion_confint
 import matplotlib
@@ -16,8 +18,9 @@ from tqdm.auto import tqdm
 from deepom import bionano_utils, localizer, aligner
 from deepom.aligner import Aligner
 from deepom.bionano_utils import XMAPItem, BionanoRefAlignerRun, MoleculeSelector, BNXItemCrop, BionanoFileData
+from deepom.falcon_compare import Falcon
 from deepom.localizer import LocalizerModule, LocalizerOutputItem
-from deepom.utils import Config, Paths, asdict_recursive, nested_dict_filter_types, pickle_dump, \
+from deepom.utils import Config, Paths, asdict_recursive, generate_name, nested_dict_filter_types, pickle_dump, \
     pickle_load, git_commit, timestamp_str_iso_8601
 
 
@@ -196,6 +199,28 @@ class BionanoCompare:
             yield _qry_item(orientation="+", locs=locvec)
             yield _qry_item(orientation="-", locs=numpy.sort(image_len - locvec))
 
+
+    def falcon_qry_items(self):
+        inference_items = self.executor.map(self.crop_inference_falcon, self.data_prep.crop_items)
+        for inference_item in inference_items:
+            scale = self.nominal_scale
+
+            locvec = numpy.sort(inference_item.x)
+            image_len = inference_item.image_input.shape[-1]
+
+            def _qry_item(orientation, locs):
+                qry_item = QryItem()
+                qry_item.locs = numpy.sort(locs)
+                qry_item.qry = qry_item.locs * scale
+                qry_item.scale = scale
+                qry_item.orientation = orientation
+                qry_item.crop_item = inference_item.crop_item
+                qry_item.inference_item = inference_item
+                return qry_item
+
+            yield _qry_item(orientation="+", locs=locvec)
+            yield _qry_item(orientation="-", locs=numpy.sort(image_len - locvec))
+
     def crop_inference(self, crop_item):
         image_input = crop_item.segment_image[0]
         target_width = self.localizer_module.image_channels
@@ -204,6 +229,22 @@ class BionanoCompare:
         inference_item = self.localizer_module.inference_item(image_input)
         inference_item.crop_item = crop_item
         return inference_item
+
+    def crop_inference_falcon(self, crop_item):
+        image_file = str(self.get_output_file_base(self.run_name)) + "_" + str(crop_item.molecule_id) + ".tif"
+        image_input = crop_item.segment_image[0]
+        image_input = image_input - numpy.min(image_input)
+        image_input = image_input / numpy.max(image_input)
+        image_input = img_as_uint(image_input)
+        source_width = image_input.shape[0] // 2 + 1
+        target_width = 9
+        image_input = image_input[source_width - target_width // 2: source_width + target_width // 2 + 1]
+        imageio.mimwrite(image_file, image_input[None])
+        item = self.falcon(image_file)
+        item.image_input = image_input
+        item.crop_item = crop_item
+        return item
+        
 
     def bnx_qry_items(self):
         scale = self.nominal_scale / Config.BIONANO_BNX_SCALE
@@ -316,6 +357,10 @@ class BionanoCompare:
         self.aligner_items = list(self.aligner_alignment_items_top(self.localizer_qry_items()))
         print(f"{len(self.aligner_items)=}")
 
+    def run_aligner_falcon(self):
+        self.aligner_items_falcon = list(self.aligner_alignment_items_top(self.falcon_qry_items()))
+        print(f"{len(self.aligner_items_falcon)=}")
+
     def run_aligner_bnx(self):
         self.aligner_bnx_items = list(self.aligner_alignment_items_top(self.bnx_qry_items()))
         print(f"{len(self.aligner_bnx_items)=}")
@@ -368,6 +413,28 @@ class BionanoCompare:
         self.run_bionano_refaligner()
         self.run_aligners()
 
+    def run_falcon_compare(self):
+        self.falcon = Falcon()
+        self.falcon.start()
+        self.data_prep.num_crops_per_size = 128
+        # self.data_prep.num_sizes = 4
+
+        self.data_prep.selector.top_mol_num = 8
+        self.data_prep.selector.run_ids = numpy.arange(8) + 1
+
+        self.init_run()
+        self.read_cmap()
+        self.make_refs()
+
+        self.data_prep.make_crops()
+        self.data_prep.print_crops_report()
+
+        self.run_aligner_falcon()
+        self.output_pickle_dump(self.aligner_items_falcon, ".aligner_falcon.pickle")
+
+        self.run_aligner()
+        self.output_pickle_dump(self.aligner_items, ".aligner.pickle")
+        
     def get_params(self):
         params = asdict_recursive(self, include_modules=[self.__module__, bionano_utils, localizer, aligner])
         params = {"commit": git_commit()} | nested_dict_filter_types(params)
@@ -387,6 +454,12 @@ class BionanoCompareReport:
             self.aligner_items = pickle_load(file_base.with_suffix(".aligner.pickle"))
         except FileNotFoundError:
             pass
+
+        try:
+            self.aligner_items_falcon = pickle_load(file_base.with_suffix(".aligner_falcon.pickle"))
+        except FileNotFoundError:
+            pass
+
         try:
             self.aligner_bnx_items = pickle_load(file_base.with_suffix(".aligner_bnx.pickle"))
         except FileNotFoundError:
@@ -475,6 +548,10 @@ class BionanoCompareReport:
         self.aligner_accuracy_items = list(self.accuracy_items(self.aligner_items))
         self.aligner_accuracy = self.plot_accuracy(self.aligner_accuracy_items, label="DeepOM")
 
+    def plot_aligner_falcon_accuracy(self):
+        self.aligner_falcon_accuracy_items = list(self.accuracy_items(self.aligner_items_falcon))
+        self.aligner_falcon_accuracy = self.plot_accuracy(self.aligner_falcon_accuracy_items, label="FALCON")
+
     def plot_a(self):
         self.plot_compare_init()
         self.plot_aligner_accuracy()
@@ -488,5 +565,6 @@ class BionanoCompareReport:
 
 
 if __name__ == '__main__':
-    BionanoCompare().run_bionano_compare_a()
-    BionanoCompare().run_bionano_compare_b()
+    # BionanoCompare().run_bionano_compare_a()
+    # BionanoCompare().run_bionano_compare_b()
+    BionanoCompare().run_falcon_compare()

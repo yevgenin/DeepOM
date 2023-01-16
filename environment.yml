@@ -6,7 +6,9 @@ channels:
   - conda-forge
 
 dependencies:
+  - python=3.10.8
   - pytorch-cuda=11.6
+  - torchvision
   - monai
   - fire
   - jupyter
@@ -25,7 +27,6 @@ dependencies:
   - seaborn
   - statsmodels
   - tensorboard
-  - torchvision
   - scikit-learn
   - scikit-image
   - imageio

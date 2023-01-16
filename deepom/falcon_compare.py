@@ -14,8 +14,10 @@ class Falcon:
         
     def start(self):
         self.engine = matlab.engine.start_matlab()
-        self.engine.addpath("../../FALCON2D/functions")
-        self.engine.addpath("../../FALCON2D")
+        falcon_path = Path(__file__).parent.parent.parent.joinpath("FALCON2D").resolve()
+        print(falcon_path)
+        self.engine.addpath(str(falcon_path))
+        self.engine.addpath(str(falcon_path / "functions"))
         return self
     
     def __exit__(self, exc_type, exc_value, traceback):
