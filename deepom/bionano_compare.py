@@ -17,7 +17,7 @@ from tqdm.auto import tqdm
 
 from deepom import bionano_utils, localizer, aligner
 from deepom.aligner import Aligner
-from deepom.bionano_utils import XMAPItem, BionanoRefAlignerRun, MoleculeSelector, BNXItemCrop, BionanoFileData
+from deepom.bionano_utils import XMAPItem, BionanoRefAlignerRun, MoleculeSelector, BNXItemCrop, BionanoFileData, BNXItem
 from deepom.falcon_compare import Falcon
 from deepom.localizer import LocalizerModule, LocalizerOutputItem
 from deepom.utils import Config, Paths, asdict_recursive, generate_name, nested_dict_filter_types, pickle_dump, \
@@ -30,16 +30,19 @@ class DataPrep:
     num_sizes = 24
     nominal_scale = Config.BIONANO_NOMINAL_SCALE
 
-    def __init__(self):
+    def __init__(self, simulated_mode=False):
         self.rng = default_rng(seed=0)
-        self.selector = MoleculeSelector()
+        self.selector = MoleculeSelector(read_images=not simulated_mode)
+        self.simulated_mode = simulated_mode
+        self.refs = None
 
     def crops_df(self):
         return DataFrame(map(vars, self.crop_items))
 
     def make_crops(self):
         self.selector.select_molecules()
-
+        if self.simulated_mode:
+            self.make_simulated_molecules()
         self.crop_sizes_bp = numpy.geomspace(*self.crop_size_range_bp, self.num_sizes)[::-1]
         print("crop_sizes", self.crop_sizes_bp)
 
@@ -98,6 +101,11 @@ class DataPrep:
     def make_crops_bnx(self):
         self.bnx_text = self.bnx_items_to_text([_.bnx_item for _ in self.crop_items])
 
+    def make_simulated_molecules(self):
+        selected: "BNXItem"
+        for selected in self.selector.selected:
+            selected.make_simulated_image(refs=self.refs)
+
 
 class QryItem:
     orientation: str
@@ -147,10 +155,10 @@ class BionanoCompare:
     aligner_use_bnx_locs = False
     parallel = True
 
-    def __init__(self):
+    def __init__(self, simulated_mode=False):
         self.cmap_file_data = BionanoFileData()
         self.bionano_ref_aligner_run = BionanoRefAlignerRun()
-        self.data_prep = DataPrep()
+        self.data_prep = DataPrep(simulated_mode=simulated_mode)
         self.localizer_module = LocalizerModule()
         self.run_name = timestamp_str_iso_8601()
         self.report = BionanoCompareReport()
@@ -199,7 +207,6 @@ class BionanoCompare:
             yield _qry_item(orientation="+", locs=locvec)
             yield _qry_item(orientation="-", locs=numpy.sort(image_len - locvec))
 
-
     def falcon_qry_items(self):
         inference_items = self.executor.map(self.crop_inference_falcon, self.data_prep.crop_items)
         for inference_item in inference_items:
@@ -244,7 +251,6 @@ class BionanoCompare:
         item.image_input = image_input
         item.crop_item = crop_item
         return item
-        
 
     def bnx_qry_items(self):
         scale = self.nominal_scale / Config.BIONANO_BNX_SCALE
@@ -306,6 +312,7 @@ class BionanoCompare:
             ref_id: ref_df[ref_df["LabelChannel"] == 1]["Position"].values
             for ref_id, ref_df in self.cmap_file_data.file_df.groupby("CMapId")
         })
+        self.data_prep.refs = self.refs
 
     def aligner_alignment_items_top(self, qry_items):
         items = self.aligner_alignment_items(qry_items)
@@ -434,7 +441,7 @@ class BionanoCompare:
 
         self.run_aligner()
         self.output_pickle_dump(self.aligner_items, ".aligner.pickle")
-        
+
     def get_params(self):
         params = asdict_recursive(self, include_modules=[self.__module__, bionano_utils, localizer, aligner])
         params = {"commit": git_commit()} | nested_dict_filter_types(params)
@@ -567,4 +574,4 @@ class BionanoCompareReport:
 if __name__ == '__main__':
     # BionanoCompare().run_bionano_compare_a()
     # BionanoCompare().run_bionano_compare_b()
-    BionanoCompare().run_falcon_compare()
+    BionanoCompare(simulated_mode=True).run_falcon_compare()

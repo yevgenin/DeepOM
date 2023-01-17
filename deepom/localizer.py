@@ -118,13 +118,24 @@ class SimulatedDataItem(DataItem):
         return x.rvs(random_state=self.rng, size=size)
 
     def make_params(self):
-        assert self.sitevec is not None
-        assert is_sorted(self.sitevec)
-        assert len(self.sitevec) >= 2
-
         for key, val in vars(self).items():
             if isinstance(val, RandomSample):
                 setattr(self, key, val.random_sample(self.rng))
+
+    def make_image(self):
+        self.make_params()
+        self.make_fragment()
+        self.make_fragment_image()
+
+    def make_fragment_image(self):
+        self.make_emitter_coords()
+        self.make_emitter_field()
+        self.make_image_readout()
+
+    def make_fragment(self):
+        assert self.sitevec is not None
+        assert is_sorted(self.sitevec)
+        assert len(self.sitevec) >= 2
 
         if self.offset is None:
             offset_start, offset_stop = self.sitevec.min(), self.sitevec.max() - self.fragment_len
@@ -134,14 +145,6 @@ class SimulatedDataItem(DataItem):
             else:
                 self.offset = offset_start
 
-    def make_image(self):
-        self.make_params()
-        self.make_fragment()
-        self.make_emitter_coords()
-        self.make_emitter_field()
-        self.make_image_readout()
-
-    def make_fragment(self):
         start, stop = self.offset, self.offset + self.fragment_len
         start_i, stop_i = self.sitevec.searchsorted([start, stop])
         self.fragment_sitevec_indices = numpy.arange(start_i, stop_i)
@@ -561,7 +564,7 @@ class LocalizerOutputs(NamedTuple):
 
 
 class LocalizerModule(TrainerMixin):
-    def __init__(self, sparsity = 4 ** 6, nominal_num_labels_fragment = 16):
+    def __init__(self, sparsity=4 ** 6, nominal_num_labels_fragment=16):
         super().__init__()
         self.divisible_size = 16
         self.min_spatial_size = 32

@@ -15,6 +15,7 @@ from sqlalchemy import create_engine
 from tqdm.auto import tqdm
 
 from deepom.config import Config
+from deepom.localizer import SimulatedDataItem
 from deepom.utils import timestamp_str_iso_8601, Paths, cached_func, is_sorted
 from deepom.utils_cached import read_jxr, read_jxr_segment
 
@@ -101,6 +102,14 @@ class BNXItem:
     def __init__(self):
         self.molecule_id = None
 
+    def plot_simulated(self):
+        pyplot.subplots(figsize=(30, 3))
+        im, = self.bionano_image.segment_image
+        pyplot.gca().pcolorfast((0, im.shape[-1]), (-.5, .5), im, cmap='gray')
+        pyplot.eventplot(self.simulated.fragment_sitevec / self.simulated.scale + self.simulated.strand_image_offset[0],
+                         lineoffsets=-.2, linelengths=.4, colors='r', alpha=.5)
+        pyplot.grid(False)
+
     def plot_bnx_item(self):
         pyplot.subplots(figsize=(30, 3))
         im, = self.bionano_image.segment_image
@@ -116,18 +125,35 @@ class BNXItem:
         ]
         return "\n".join(lines_data)
 
-    def parse_bnx(self, row):
+    def parse_bnx(self, row, read_image=True):
         self.molecule_id = row["MoleculeID"]
         self.locs = Series(parse_bionano_file_line(row["1"])[1:-1]).astype(float).values
         self.bnx_record = row
 
-        self.bionano_image = BionanoImage()
-        self.bionano_image.bnx_item = self
-        self.bionano_image.read_bionano_image()
-
         self.xmap_item = XMAPItem()
         self.xmap_item.xmap_record = self.bnx_record
         self.xmap_item.parse_values()
+
+        self.bionano_image = BionanoImage()
+        self.bionano_image.bnx_item = self
+        if read_image:
+            self.bionano_image.read_bionano_image()
+
+    def make_simulated_image(self, refs: dict):
+        xmap_item = self.xmap_item
+        simulated = SimulatedDataItem()
+        simulated.lat_size_min = 9
+        simulated.stray_density = 1e-9
+        reference_lims = xmap_item.ref_lims
+        reference_positions = refs[xmap_item.ref_id]
+        start, stop = reference_positions.searchsorted(reference_lims)
+        reference_positions = reference_positions[start:stop + 1]
+        simulated.fragment_sitevec = reference_positions - reference_positions[0]
+        simulated.xmap_item = xmap_item
+        simulated.make_params()
+        simulated.make_fragment_image()
+        self.simulated = simulated
+        self.bionano_image.segment_image = simulated.image
 
 
 class BionanoImage:
@@ -194,9 +220,11 @@ class MoleculeSelector:
     scan_ids = None
     jxr_channel = 3
 
-    def __init__(self):
+    def __init__(self, read_images=True):
         self.bnx_file_data = BNXFileData()
         self.xmap_file_data = BionanoFileData()
+        self.simulated_mode = False
+        self.read_images = read_images
 
     def read_files(self):
         self.bnx_file_data.parse_header()
@@ -294,7 +322,7 @@ class MoleculeSelector:
                 bnx_item = BNXItem()
                 bnx_item.meta_fields = self.bnx_file_data.names
                 bnx_item.block_fields = self.bnx_file_data.block_fields
-                bnx_item.parse_bnx(row)
+                bnx_item.parse_bnx(row, read_image=self.read_images)
                 yield bnx_item
 
         self.selected = list(tqdm(_items(), desc="selected"))
