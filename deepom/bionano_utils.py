@@ -151,7 +151,12 @@ class BNXItem:
         reference_positions = refs[xmap_item.ref_id]
         start, stop = reference_positions.searchsorted(reference_lims)
         reference_positions = reference_positions[start:stop + 1]
-        simulated.fragment_sitevec = reference_positions - reference_positions[0]
+        if xmap_item.orientation == "+":
+            simulated.fragment_sitevec = reference_positions - reference_positions[0]
+        elif xmap_item.orientation == "-":
+            simulated.fragment_sitevec = numpy.sort(reference_positions[-1] - reference_positions)
+        else:
+            raise ValueError
         simulated.xmap_item = xmap_item
         simulated.make_params()
         simulated.make_fragment_image()

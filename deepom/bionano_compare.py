@@ -212,7 +212,12 @@ class BionanoCompare:
         for inference_item in inference_items:
             scale = self.nominal_scale
 
-            locvec = numpy.sort(inference_item.x)
+            x_locs = inference_item.x
+            y_locs = inference_item.y
+            h = inference_item.image_input.shape[0]
+            margin = 1
+            x_locs = x_locs[(y_locs <= h / 2 + margin) & (y_locs >= h / 2 - margin)]
+            locvec = numpy.sort(x_locs)
             image_len = inference_item.image_input.shape[-1]
 
             def _qry_item(orientation, locs):
@@ -421,21 +426,21 @@ class BionanoCompare:
         self.run_aligners()
 
     def run_falcon_compare(self):
-        self.falcon = Falcon()
-        self.falcon.start()
-
         self.init_run()
         self.read_cmap()
         self.make_refs()
 
-        self.data_prep.num_crops_per_size = 512
-        # self.data_prep.num_sizes = 2
+        # self.data_prep.num_crops_per_size = 16
+        # self.data_prep.crop_size_range_bp = 300 * 1000, 450 * 1000
+        # self.data_prep.num_sizes = 1
         self.data_prep.selector.top_mol_num = 8
         self.data_prep.selector.run_ids = numpy.arange(8) + 1
 
         self.data_prep.make_crops()
         self.data_prep.print_crops_report()
-
+        #
+        self.falcon = Falcon()
+        self.falcon.start()
         self.run_aligner_falcon()
         self.output_pickle_dump(self.aligner_items_falcon, ".aligner_falcon.pickle")
 
