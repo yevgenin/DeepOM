@@ -139,11 +139,14 @@ class BNXItem:
         if read_image:
             self.bionano_image.read_bionano_image()
 
-    def make_simulated_image(self, refs: dict):
+    def make_simulated_image(self, refs: dict, rng):
         xmap_item = self.xmap_item
         simulated = SimulatedDataItem()
+        simulated.rng = rng
+        simulated.label_eff = 1
         simulated.lat_size_min = 9
         simulated.stray_density = 1e-9
+        simulated.scale = Config.BIONANO_NOMINAL_SCALE
         reference_lims = xmap_item.ref_lims
         reference_positions = refs[xmap_item.ref_id]
         start, stop = reference_positions.searchsorted(reference_lims)

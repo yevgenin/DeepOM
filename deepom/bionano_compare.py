@@ -104,7 +104,7 @@ class DataPrep:
     def make_simulated_molecules(self):
         selected: "BNXItem"
         for selected in self.selector.selected:
-            selected.make_simulated_image(refs=self.refs)
+            selected.make_simulated_image(refs=self.refs, rng=self.rng)
 
 
 class QryItem:
@@ -423,15 +423,15 @@ class BionanoCompare:
     def run_falcon_compare(self):
         self.falcon = Falcon()
         self.falcon.start()
-        self.data_prep.num_crops_per_size = 128
-        # self.data_prep.num_sizes = 4
-
-        self.data_prep.selector.top_mol_num = 8
-        self.data_prep.selector.run_ids = numpy.arange(8) + 1
 
         self.init_run()
         self.read_cmap()
         self.make_refs()
+
+        self.data_prep.num_crops_per_size = 512
+        # self.data_prep.num_sizes = 2
+        self.data_prep.selector.top_mol_num = 8
+        self.data_prep.selector.run_ids = numpy.arange(8) + 1
 
         self.data_prep.make_crops()
         self.data_prep.print_crops_report()
@@ -575,3 +575,4 @@ if __name__ == '__main__':
     # BionanoCompare().run_bionano_compare_a()
     # BionanoCompare().run_bionano_compare_b()
     BionanoCompare(simulated_mode=True).run_falcon_compare()
+    BionanoCompare().run_falcon_compare()
