@@ -459,6 +459,9 @@ class BionanoCompareReport:
     aligner_items = None
     aligner_bnx_items = None
     bionano_items = None
+    ls = "-"
+    label_prefix = ""
+    color = "red"
 
     def read_compute_results(self):
         file_base = Paths().out_path("bionano_compare", self.run_name, self.run_name)
@@ -522,13 +525,13 @@ class BionanoCompareReport:
         num_observarions = correct.count()
         acc = (num_successes / num_observarions)
         len_bp = acc.index.values
-        pyplot.plot(len_bp, acc.values, marker='.', label=label)
+        pyplot.plot(len_bp, acc.values, marker='.', label=self.label_prefix + label, ls=self.ls, color=self.color)
 
         ci = numpy.stack([
             proportion_confint(count=count, nobs=nobs, alpha=self.confidence_alpha, method='beta')
             for count, nobs in zip(num_successes, num_observarions)
         ])
-        pyplot.fill_between(len_bp, ci.T[0], ci.T[1], alpha=0.2)
+        pyplot.fill_between(len_bp, ci.T[0], ci.T[1], alpha=0.2, color=self.color)
         return acc
 
     def plot_compare_init(self):
@@ -577,7 +580,5 @@ class BionanoCompareReport:
 
 
 if __name__ == '__main__':
-    # BionanoCompare().run_bionano_compare_a()
-    # BionanoCompare().run_bionano_compare_b()
-    BionanoCompare(simulated_mode=True).run_falcon_compare()
-    BionanoCompare().run_falcon_compare()
+    BionanoCompare().run_bionano_compare_a()
+    BionanoCompare().run_bionano_compare_b()

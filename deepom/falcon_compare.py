@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import List, Tuple
 from matplotlib import pyplot as plt
 
+
+
 class FalconLocalizations:
     x: np.ndarray
     y: np.ndarray
@@ -31,3 +33,9 @@ class Falcon:
         locs.x = x
         locs.y = y
         return locs
+
+
+if __name__ == "__main__":
+    from deepom.bionano_compare import BionanoCompare
+    BionanoCompare(simulated_mode=True).run_falcon_compare()
+    BionanoCompare().run_falcon_compare()
