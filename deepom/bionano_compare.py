@@ -1,3 +1,4 @@
+from timeit import timeit
 import coolname
 import imageio
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -424,6 +425,24 @@ class BionanoCompare:
         self.data_prep.make_crops_bnx()
         self.run_bionano_refaligner()
         self.run_aligners()
+
+    def run_compare_runtimes_vs_bionano(self):
+        self.data_prep.selector.top_mol_num = 1
+        self.data_prep.num_crops_per_size = 100
+        self.data_prep.crop_size_range_bp = 100 * 1000, 100 * 1000
+        self.data_prep.num_sizes = 1
+        self.data_prep.selector.run_ids = numpy.arange(8) + 1
+        self.init_run()
+        self.read_cmap()
+        self.make_refs()
+
+        self.data_prep.make_crops()
+        self.data_prep.print_crops_report()
+        self.data_prep.make_crops_bnx()
+        
+        timeit(self.run_bionano_on_bnx(), globals=globals(), number=1, repeat=10)
+        
+        self.run_aligner()
 
     def run_falcon_compare(self):
         self.init_run()
