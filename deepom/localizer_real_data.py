@@ -11,20 +11,45 @@ from monai.losses import DiceCELoss
 from monai.networks.nets import BasicUNet
 from monai.transforms import Compose, SelectItemsd, SpatialPad, SpatialCrop, AddChannel, ScaleIntensity, SqueezeDim, \
     DivisiblePad, ToNumpy
+import numpy
+from matplotlib.pyplot import eventplot, imshow, figure, xlim, savefig, gca
 from numpy import ndarray, stack, int_
 from numpy.random import default_rng
 from tqdm.auto import tqdm, trange
 from torch import Tensor, from_numpy
-from torch.optim import Adam
+from torch.optim import Adam, SGD
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 from deepom.config import Config
 from deepom.aligner import Aligner
 from deepom.localizer import LocalizerModule
 from deepom.bionano_utils import XMAPItem, BionanoRefAlignerRun, MoleculeSelector, BNXItemCrop, BionanoFileData
 from deepom.data_fetcher import DataFetcher
-from deepom.my_utils import dice_loss, MetaBase
-from deepom.utils import path_mkdir, generate_name, Paths, asdict_recursive, nested_dict_filter_types
+from deepom.my_utils import dice_loss, MetaBase, torch_temporary_seed, fp_precentage ,fn_precentage
+from deepom.utils import path_mkdir, generate_name, Paths, asdict_recursive, nested_dict_filter_types, inference_eval, numpy_sigmoid, find_file, num_module_params, pickle_dump, pickle_load
 from deepom.common_types import LocalizerEnum, LocalizerLosses, LocalizerGT, LocalizerOutputs, DataItem
 
+from torch.utils.data import TensorDataset
+from torch.utils.data.dataloader import DataLoader
+
+
+class LocalizerOutputItem:
+    def __init__(self):
+        self.image = None
+        self.image_input = None
+        self.loc_pred_delta = None
+        self.loc_pred = None
+        self.output_tensor = None
+        self.label_pred = None
+        self.outputs = None
+
+
+    def make_pred(self, output_tensor):
+        self.output_tensor = output_tensor
+        self.outputs = LocalizerOutputs(*output_tensor)
+        self.label_pred = torch.sigmoid(self.outputs.label_output) > 0.5
+        self.loc_pred_delta = numpy_sigmoid(self.outputs.loc_output)
+        indices = numpy.flatnonzero(self.label_pred.numpy())
+        self.loc_pred = indices + self.loc_pred_delta[indices]
 
 
 class DataLocalizer(metaclass=MetaBase):
@@ -41,21 +66,29 @@ class DataLocalizer(metaclass=MetaBase):
         self.dtype = torch.float32
         self.lr = 1e-3
         self.optimizer = Adam(self.net.parameters(), lr=self.lr)
-        self.log_metrics_every = 1
+        self.scheduler = ReduceLROnPlateau(self.optimizer, 'min')
+        self.log_metrics_every = 100
         self.batch_size = 1
         self.epochs = 5
         self.log_images_every = 1000
-        self.validation_every = 2000
-        self.checkpoint_every = 10000
+        self.validation_every = None
+        self.checkpoint_every = 850
+        self.nominal_scale = Config.BIONANO_NOMINAL_SCALE
+
+        self.module_output_item = LocalizerOutputItem()
+        self.module_output_item.nominal_scale = self.nominal_scale
         
-        self.top_mol_num = 100
-        self.molecule_amount = 240
-        
-        self.data_fetcher = DataFetcher(self.top_mol_num)
-        self.test_data_ratio = 0.2
+        self.top_mol_num = 1 #Amount of actual images loaded by the datafetcher
+        # self.molecule_amount = 240 #Amount of samples to be used in the dataset
+        self.test_data_ratio = 0 #Validation to train set ratios
+        self.genome_size = 24
+        self.threshold = 0.99
+        self.data_fetcher = DataFetcher(self.top_mol_num, self.threshold)
+        self.simulated_images = True
         
         # Reproducability
         self.seed = 42
+        self.name_seed = 343
         self.init_rng()
         # Logging Info
         self.run_name = None
@@ -68,12 +101,24 @@ class DataLocalizer(metaclass=MetaBase):
         self.log_tqdm_postfix = {}
         
         self.paths_config = Paths()
-        self.task_name = type(self).__name__
-        self.task_root_dir = self.paths_config.out_path(self.task_name)
+        self.task_name = type(self).__name__ #DataLocalizer
+        self.task_root_dir = Config.LOCALIZER_TRAINING_OUTPUT_DIR
+        self.data_root_dir = Config.GROUND_TRUTH_DIR
+        self.checkpoint_search_dir = Config.SECOND_CHECKPOINT_SEARCH_DIR
+        self.load_checkpoint = False 
+        self.save_data = True
+        self.best_loss = numpy.inf 
+        self.early_stopping = 200
+        self.num_stagnant_epochs = 0
+        self.stop_training = False
         
-    
+        self.eval_localizer = self.data_fetcher.localizer #yevgeni's
+        self.checkpoint_file = Config.CHECKPOINT_FILE
+        self.dice_smooth = 100
+        self.test_data = None 
       
     def init_rng(self):
+        
         set_determinism(seed=self.seed)
         self.rng = default_rng(seed=self.seed)    
 
@@ -88,7 +133,7 @@ class DataLocalizer(metaclass=MetaBase):
             })
 
     def _module_build(self):
-        features = stack([32, 32, 64, 128, 256, 32]) // self.unet_channel_divider
+        features = stack([32, 64, 64, 128, 256, 32]) // self.unet_channel_divider
         return BasicUNet(
             spatial_dims=1,
             features=tuple(features),
@@ -97,40 +142,28 @@ class DataLocalizer(metaclass=MetaBase):
             upsample=self.upsample,
         )
 
+    def init_ensure_module(self):
+        self.net = self._module_build()
+        self._checkpoint_load()
+        self.net.to(self.device)
+        self.__num_module_params = num_module_params(self.net)
 
-    def loss_func_prev(self, output, target):
-        if len(output.shape) == 2:
-            output = output[None]
-
-        if len(target.shape) == 2:
-            target = target[None]
-
-        assert output.shape[-1:] == target.shape[-1:]
-
-        targets = LocalizerGT(*torch.unbind(self.to_tensor(target), dim=1))
-        outputs = LocalizerOutputs(*torch.unbind(self.to_tensor(output), dim=1))
-
-        label_criterion = DiceCELoss(softmax=True, to_onehot_y=True, include_background=False)
-        bce = torch.nn.BCEWithLogitsLoss(reduction='none')
-
-        label_output = torch.stack([
-            outputs.label_bg,
-            outputs.label_stray,
-            outputs.label_fg,
-        ], dim=1)
-
-        mask = (targets.label_target > 0).float()
-        mask_mean = mask.mean()
-        assert mask_mean > 0
-
-        loss_tuple = LocalizerLosses(
-            label_loss=label_criterion(label_output, targets.label_target.long()[:, None]),
-            loc_loss=(mask * bce(outputs.loc_output, targets.loc_target)).mean() / mask_mean,
-        )
-        return {
-            "loss_tensor": torch.stack(loss_tuple).mean(),
-            "losses": loss_tuple._asdict(),
-        }
+    def _checkpoint_load(self):
+        if self.load_checkpoint:
+            try:
+                if self.checkpoint_search_dir is None:
+                    search_dir = self.task_root_dir
+                    print("no checkpoint dir found")
+                else:
+                    search_dir = self.checkpoint_search_dir
+                    print(f"search dir is {search_dir}")
+                file = find_file(search_dir=search_dir, suffix=self.checkpoint_file)
+            except (ValueError, RuntimeError):
+                print_exc()
+                raise
+            else:
+                print('loading checkpoint: ', file, '\n\n')
+                self.net.load_state_dict(torch.load(file, map_location=self.device))
 
 
     def loss_func(self, output, target):
@@ -152,38 +185,92 @@ class DataLocalizer(metaclass=MetaBase):
         self.__logger.debug(f"Label output shape {outputs.label_output.shape}")
         self.__logger.debug(f"{target.label_target[:, None].shape}")
         label_output = torch.sigmoid(outputs.label_output)
+        # loc_weight = 0.01
         loss_tuple = LocalizerLosses(
-            label_loss=dice_loss(label_output, from_numpy(target.label_target)),
-            loc_loss=(from_numpy(mask) * bce(torch.flatten(outputs.loc_output),
-                    from_numpy(target.loc_target))).mean() / mask_mean,
+            label_loss=dice_loss(label_output, from_numpy(target.label_target),self.dice_smooth),
+            loc_loss=((from_numpy(mask) * bce(torch.flatten(outputs.loc_output),
+                    from_numpy(target.loc_target))).mean() / mask_mean),
         )
+
+        label_pred = (label_output > 0.5).type(torch.int8)
+        loc_pred_delta = numpy_sigmoid(outputs.loc_output.detach())[0]
+        indices = numpy.flatnonzero(label_pred.detach().numpy())
+        # print(f"indices {indices}")
+        prediction = indices + loc_pred_delta[indices]
+
+        gt_indices = numpy.flatnonzero(target.label_target)
+        ground_truth = from_numpy(gt_indices + target.loc_target[gt_indices])
+
+        # print(f"prediction: {prediction} ")
+        # print(f"ground truth : {ground_truth}")
+        # print(f"sanity check: {prediction")
+
+        fp = fp_precentage(prediction, ground_truth)
+        fn = fn_precentage(prediction, ground_truth)
         return {
             "loss_tensor": torch.stack(loss_tuple).mean(),
             "losses": loss_tuple._asdict(),
+            "false_positive": fp,
+            "false_negative": fn
         }
 
     def step_events(self, step_item):
         self.step_index +=1
-        # self.tqdm.update()
+        self.tqdm.update()
         log_metrics_every = max(1, self.log_metrics_every // self.batch_size)
         log_images_every = max(1, self.log_images_every // self.batch_size)
-        validation_every = max(1, self.validation_every // self.batch_size)
+        #validation_every = max(1, self.validation_every // self.batch_size)
 
         # if self.step_index % log_images_every == 0:
         #     self.log_train_batch(step_item)
 
-        # if self.step_index % validation_every == 0:
-        #     self.validation_step()
-
+           
         if self.step_index % log_metrics_every == 0:
             metrics_item = step_item
             self._log_update_tqdm_postfix({"total loss":metrics_item["loss_tensor"].item()})
             self.log_metrics({"train": metrics_item})
-
-        if self.checkpoint_every is not None:
-            checkpoint_every = max(1, self.checkpoint_every // self.batch_size)
-            if self.step_index % checkpoint_every == 0:
-                self.checkpoint_save()
+            self.scheduler.step(metrics_item["loss_tensor"].item()) 
+            if (self.best_loss > metrics_item["loss_tensor"].item()):
+                self.best_loss = metrics_item["loss_tensor"].item()
+                if self.checkpoint_every is not None:
+                    checkpoint_every = max(1, self.checkpoint_every // self.batch_size)
+                    if self.step_index % checkpoint_every == 0:
+                        self.checkpoint_save()
+                    
+                if self.early_stopping is not None:
+                    self.num_stagnant_epochs = 0 
+                
+            else:
+                self.num_stagnant_epochs += 1
+        
+            if self.early_stopping is not None and self.num_stagnant_epochs >= self.early_stopping:
+                self.stop_training = True
+           
+    def validation_step(self,step_item,image_input,target:LocalizerGT):
+        # print(len(image_input))
+        our_fp = step_item["false_positive"]
+        our_fn = step_item["false_negative"]
+        prediction = numpy.flatnonzero(self.eval_localizer.inference_item(image_input).loc_pred)
+      
+        gt_indices = numpy.flatnonzero(target.label_target)
+        ground_truth = (gt_indices + target.loc_target[gt_indices])
+        # print(prediction)
+        # print(ground_truth)
+        eval_fp = fp_precentage(prediction, ground_truth)
+        eval_fn = fn_precentage(prediction, ground_truth)
+        
+        print(f" our fp: {our_fp}, eval fp {eval_fp}")
+        print(f" our fn: {our_fn}, eval fn {eval_fn}")
+        
+                
+    def checkpoint_save(self):
+        checkpoint_file = self.paths_config.out_file_mkdir(self.checkpoint_search_dir, self.checkpoint_file)
+        print(f"saving model in {checkpoint_file}")
+        if checkpoint_file.exists():
+            shutil.copy(checkpoint_file, checkpoint_file.with_suffix('.bkp'))
+        self._log_update_tqdm_postfix({"ckpt": self.step_index})
+        torch.save(self.net.state_dict(), checkpoint_file)
+        
     
     
     def _resize_pad_or_crop_end(self, size):
@@ -202,7 +289,8 @@ class DataLocalizer(metaclass=MetaBase):
         ])(image_2d)
     
     def generate_random_task_name(self):
-        self.run_name = generate_name(self.task_name)
+        with torch_temporary_seed(self.name_seed):
+            self.run_name = generate_name(self.task_name)
         # if self.test_mode_enable:
         #     self.task_root_dir = self.task_root_dir / Config.TEST_DIR
         self.run_root_dir = (self.task_root_dir / self.run_name)
@@ -233,9 +321,6 @@ class DataLocalizer(metaclass=MetaBase):
         self.log_tqdm_postfix |= metrics_dict
         self.tqdm.set_postfix(self.log_tqdm_postfix)
 
-    # def _on_log_init_end(self):
-    #     if self.log_wandb_enable:
-    #         wandb.watch(models=self.module, log="all", log_graph=True)
 
     def to_tensor(self, x):
         return convert_to_tensor(x, device=self.device, dtype=self.dtype)
@@ -250,8 +335,13 @@ class DataLocalizer(metaclass=MetaBase):
             SpatialPad(spatial_size=self.min_spatial_size, method=Method.END),
             DivisiblePad(k=self.divisible_size, method=Method.END)
         ])(image_input)
-
-        x = x[:,0:data.ground_truth.label_target.shape[0]]
+        #print(data.ground_truth.label_target.shape[0],x.shape[-1])
+        x, data = self.crop_to_min(x, data)
+        #print(data.ground_truth.label_target.shape[0],x.shape[-1])
+        # data = Compose([
+        #     self._resize_pad_or_crop_end(x.shape[-1:]),
+        # ])(data.ground_truth)
+        # print(f"ground_truth shape: {data.ground_truth.shape}, input shape: {x.shape}")
         self.__logger.debug("gt :"+ str(data.ground_truth.label_target.shape))
 
         self.optimizer.zero_grad()
@@ -263,47 +353,191 @@ class DataLocalizer(metaclass=MetaBase):
         self.optimizer.step()
 
         step_item = loss
+            
         self.step_events(step_item)
+        
+        if self.validation_every is not None and self.step_index % self.validation_every == 0:
+            self.validation_step(step_item,data.molecule.bionano_image.segment_image[0][:x.shape[-1]],data.ground_truth)
+
+    def crop_to_min(self, x, mol):
+        if x.shape[-1]< mol.ground_truth.label_target.shape[0]:
+            a = mol.ground_truth.label_target[:x.shape[-1]]
+            b = mol.ground_truth.loc_target[:x.shape[-1]]
+            ground_truth = LocalizerGT(a,b)
+            item = DataItem(mol.molecule, ground_truth)
+            return x, item
+        else:
+            x = x[:,0:mol.ground_truth.label_target.shape[0]]
+            return x, mol
+
 
     def get_ground_truth(self,mol_index):
-        return self.data_fetcher.generate_ground_truth(mol_index)
+        if self.simulated_images:
+            return self.data_fetcher.generate_ground_truth_simulated(mol_index)
+        else:
+            return self.data_fetcher.generate_ground_truth(mol_index)
 
     def prepare_data(self):
-        num_of_test_molecules = round(self.molecule_amount * self.test_data_ratio)
-        test_molecules_ids = self.rng.choice(range(1,self.molecule_amount+1), size= num_of_test_molecules, replace = False)
-        train_molecules_ids = [i for i in range(1, self.molecule_amount+1) if i not in test_molecules_ids]
+        num_of_test_molecules = round(self.genome_size * self.test_data_ratio)
+        molecule_index_list = range(1, self.genome_size+1) # by default, list from 1 to 24
+        test_molecules_ids = self.rng.choice(molecule_index_list, size= num_of_test_molecules, replace = False)
+        train_molecules_ids = [i for i in molecule_index_list if i not in test_molecules_ids]
+
+        # saving test molecule id list for benchmark use
+        self.output_test_list_pickle(test_molecules_ids)
+        print(f"test_molecules_ids: {test_molecules_ids}")
         train_data = []
         test_data = []
+
         for mol_index in trange(self.top_mol_num,desc="Creating Ground Truth Data",unit="molecules"):
-            mol, a, b = self.get_ground_truth(mol_index)
-            ground_truth = LocalizerGT(a,b)
-            item = DataItem(mol, ground_truth)
+            mol, a, b  = self.get_ground_truth(mol_index)
+            if mol != None:
+                ground_truth = LocalizerGT(a,b)
+                item = DataItem(mol, ground_truth)
 
-            if mol.xmap_item.ref_id in train_molecules_ids:
-                train_data.append(item)
-            else:
-                test_data.append(item)
+                if mol.xmap_item.ref_id in train_molecules_ids:
+                    train_data.append(item)
+                else:
+                    test_data.append(item)
+                    
+        print("train data size: " + str(len(train_data)))
+        print("test data size: " + str(len(test_data)))
+        
+        if self.save_data:
+            self.output_pickle_dump(train_data,f".train_data_simulated_images_{self.top_mol_num}.pickle")
+            self.output_pickle_dump(test_data,f".test_data_simulated_images_{self.top_mol_num}.pickle")
 
+        self.test_data = test_data
         return train_data, test_data 
 
 
     def train(self, train_data):     
         try:
-            #Order important, if task name generated after rng reset all tasks will have the same name
             self.generate_random_task_name()
             self.init_rng()
             self.init_log()
-            for epoch in range(self.epochs):
-                with self.tqdm(train_data,unit="batch") as train_data_tqdm:
+            self.stop_training = False
+           
+            
+            for epoch in trange(self.epochs):
+                with tqdm(train_data,unit="batch") as train_data_tqdm:
                     for batch in train_data_tqdm:
+                        train_data_tqdm.set_description(f"Epoch {epoch}")
                         self._train_step(batch)
+                        if self.stop_training:
+                            break
+                
                 
         finally:
             if self.log_wandb_enable:
                 wandb.finish()
 
+                
+    def _train_data_loader(self,data):
+        dataset = TensorDataset(torch.Tensor(data))
+        print(len(data))
+        self.train_data_loader = DataLoader(dataset, batch_size=self.batch_size, num_workers=0)
+    
+    def _data_collate(self, items: list):
+        items_to_batch = Compose([
+            SelectItemsd(keys=[Keys.MODULE_INPUT, Keys.MODULE_TARGET], allow_missing_keys=True)
+        ])(items)
+        batch = list_data_collate(items_to_batch) | {Keys.BATCH_ITEMS: items}
+        return batch
+
+    def _inference_forward(self, module_input: ndarray):
+        x = Compose([
+            SpatialPad(spatial_size=self.min_spatial_size, method=Method.END),
+            DivisiblePad(k=self.divisible_size, method=Method.END)
+        ])(module_input)
+
+        # zeroing first and last pixel rows
+        # x[0] = 0
+        # x[-1] = 0
+
+        x = self.forward(x[None])
+        x = Compose([
+            ToNumpy(),
+            SqueezeDim(),
+            self._resize_pad_or_crop_end(module_input.shape[-1:]),
+        ])(x)
+
+        return x
+
+    def inference_item(self, segment_3d):
+        segment_3d[0:3] = 0
+        segment_3d[-3:] = 0
+        figure(figsize=(30, 3)) 
+        target_width = 5
+        source_width = segment_3d.shape[0] // 2 + 1
+        print_input = segment_3d[source_width - target_width // 2: source_width + target_width // 2 + 1]
+        # segment_3d[source_width - target_width // 2: source_width + target_width // 2 + 1][0] = 0
+        # segment_3d[source_width - target_width // 2: source_width + target_width // 2 + 1][-1] = 0
+        imshow(segment_3d, aspect="auto", cmap="gray")
+
+        print(f"shape segment: {segment_3d.shape}")
+
+
+        image_input = self.image_input(segment_3d)
+        figure(figsize=(30, 3)) 
+        target_width = 5
+        source_width = image_input.shape[0] // 2 + 1
+        print_input = image_input[source_width - target_width // 2: source_width + target_width // 2 + 1]
+        imshow(print_input, aspect="auto", cmap="gray")
+
+        print(f"image_input size: {image_input.shape}")
+
+        # image_input[0] = 0
+        # image_input[-1] = 0
+
+        print(f"image_input size: {type(image_input)}")
+
+        with inference_eval(self.net):
+            output_tensor = self._inference_forward(image_input)
+           
+        item = copy(self.module_output_item)
+        item.image = segment_3d
+        item.image_input = image_input
+        item.make_pred(self.to_tensor(output_tensor))
+
+        return item
+    
+    def output_pickle_dump(self, obj, suffix):
+        file = Config.GROUND_TRUTH_DIR.with_suffix(suffix)
+        print(file)
+        pickle_dump(file, obj)
         
-# if __name__ =='__main__':
-#     localizer = DataLocalizer()
-#     train_data, test_data = localizer.prepare_data()
-#     localizer.train(train_data)
+    def pickle_load(self,file):
+        return pickle_load(file)
+    
+    def output_test_list_pickle(self, obj):
+        file = Config.TEST_LIST_FILE.with_suffix(".pickle")
+        print(f"test list file: {file}")
+        pickle_dump(file, obj)
+
+    def validate_predictions(self):
+        self.tqdm = tqdm(desc="validating predictions", disable=not self.tqdm_enable)
+
+        fp_yvg = []
+        fp_our = []
+        fn_yvg = []
+        fn_our = []
+
+        with tqdm(self.test_data) as test_data:
+            for item in test_data:
+                image = item.molecule.bionano_image.segment_image[0]
+                gt_indices = numpy.flatnonzero(item.ground_truth.label_target)
+                ground_truth = (gt_indices + item.ground_truth.loc_target[gt_indices])
+
+                our_pred = self.inference_item(image).loc_pred
+                yvg_pred = self.eval_localizer.inference_item(image).loc_pred      
+
+                fp_yvg.append(fp_precentage(yvg_pred, ground_truth))
+                fn_yvg.append(fn_precentage(yvg_pred, ground_truth))
+                fp_our.append(fp_precentage(our_pred, ground_truth))
+                fn_our.append(fn_precentage(our_pred, ground_truth))
+                self.tqdm.update()
+        
+        
+        print(f"means yevgeni: fp={numpy.array(fp_yvg).mean()}, fn={numpy.array(fn_yvg).mean()}")
+        print(f"means ours: fp={numpy.array(fp_our).mean()}, fn={numpy.array(fn_our).mean()}")

@@ -27,17 +27,20 @@ class DataPrep:
     # num_sizes = 24
     nominal_scale = Config.BIONANO_NOMINAL_SCALE
 
-    def __init__(self, crop_size_range_bp = (10 * 1000, 450 * 1000), num_crops_per_size=512,  num_sizes = 24):
+    def __init__(self, crop_size_range_bp = (400 * 1000, 450 * 1000), num_crops_per_size=512, num_sizes=1, top_mol_num=512, test_id_list=[]):
+        # crop_size_range_bp = (10 * 1000, 450 * 1000), num_sizes=24
         self.rng = default_rng(seed=0)
-        self.selector = MoleculeSelector()
+        self.selector = MoleculeSelector(filter_data=True, filter_ids=test_id_list)
         self.crop_size_range_bp = crop_size_range_bp
         self.num_crops_per_size = num_crops_per_size
         self.num_sizes = num_sizes
+        self.top_mol_num = top_mol_num
 
     def crops_df(self):
         return DataFrame(map(vars, self.crop_items))
 
     def make_crops(self):
+        self.selector.top_mol_num = self.top_mol_num
         self.selector.select_molecules()
 
         self.crop_sizes_bp = numpy.geomspace(*self.crop_size_range_bp, self.num_sizes)[::-1]

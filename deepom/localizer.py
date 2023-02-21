@@ -118,13 +118,24 @@ class SimulatedDataItem(DataItem):
         return x.rvs(random_state=self.rng, size=size)
 
     def make_params(self):
-        assert self.sitevec is not None
-        assert is_sorted(self.sitevec)
-        assert len(self.sitevec) >= 2
-
         for key, val in vars(self).items():
             if isinstance(val, RandomSample):
                 setattr(self, key, val.random_sample(self.rng))
+
+    def make_image(self):
+        self.make_params()
+        self.make_fragment()
+        self.make_fragment_image()
+
+    def make_fragment_image(self):
+        self.make_emitter_coords()
+        self.make_emitter_field()
+        self.make_image_readout()
+
+    def make_fragment(self):
+        assert self.sitevec is not None
+        assert is_sorted(self.sitevec)
+        assert len(self.sitevec) >= 2
 
         if self.offset is None:
             offset_start, offset_stop = self.sitevec.min(), self.sitevec.max() - self.fragment_len
@@ -134,20 +145,13 @@ class SimulatedDataItem(DataItem):
             else:
                 self.offset = offset_start
 
-    def make_image(self):
-        self.make_params()
-        self.make_fragment()
-        self.make_emitter_coords()
-        self.make_emitter_field()
-        self.make_image_readout()
-
-    def make_fragment(self):
         start, stop = self.offset, self.offset + self.fragment_len
         start_i, stop_i = self.sitevec.searchsorted([start, stop])
         self.fragment_sitevec_indices = numpy.arange(start_i, stop_i)
         self.fragment_sitevec = self.sitevec[self.fragment_sitevec_indices]
 
         assert is_sorted(self.fragment_sitevec)
+
 
     def make_emitter_coords(self):
         self.make_labeled_coords()
@@ -156,6 +160,7 @@ class SimulatedDataItem(DataItem):
             self.labeled_coords,
             self.stray_coords,
         ])
+
 
     def make_labeled_coords(self):
         assert len(self.fragment_sitevec)
@@ -431,7 +436,7 @@ class TrainerMixin(TaskMixin):
 
         if self.checkpoint_every is not None:
             checkpoint_every = max(1, self.checkpoint_every // self.batch_size)
-            if self.step_index % checkpoint_every == 0:
+            if self.step_index % 100 == 0:
                 self.checkpoint_save()
 
     def _module_build(self):
@@ -706,7 +711,7 @@ class LocalizerModule(TrainerMixin):
 
         loss_tuple = LocalizerLosses(
             label_loss=label_criterion(label_output, targets.label_target.long()[:, None]),
-            loc_loss=(mask * bce(outputs.loc_output, targets.loc_target)).mean() / mask_mean,
+            loc_loss=((mask * bce(outputs.loc_output, targets.loc_target)).mean() / mask_mean)*0,
         )
         return {
             Keys.LOSS_TENSOR: torch.stack(loss_tuple).mean(),

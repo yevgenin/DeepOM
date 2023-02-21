@@ -13,10 +13,12 @@ from numpy import ndarray
 from pandas import DataFrame, Series
 from sqlalchemy import create_engine
 from tqdm.auto import tqdm
+from IPython.display import display
 
 from deepom.config import Config
 from deepom.utils import timestamp_str_iso_8601, Paths, cached_func, is_sorted
 from deepom.utils_cached import read_jxr, read_jxr_segment
+from deepom.localizer import SimulatedDataItem
 
 
 def parse_bionano_file_line(row):
@@ -116,7 +118,7 @@ class BNXItem:
         ]
         return "\n".join(lines_data)
 
-    def parse_bnx(self, row):
+    def parse_bnx(self, row, read_image=True):
         self.molecule_id = row["MoleculeID"]
         self.locs = Series(parse_bionano_file_line(row["1"])[1:-1]).astype(float).values
         self.bnx_record = row
@@ -129,6 +131,44 @@ class BNXItem:
         self.xmap_item.xmap_record = self.bnx_record
         self.xmap_item.parse_values()
 
+        self.bionano_image = BionanoImage()
+        self.bionano_image.bnx_item = self
+
+        if read_image:
+            self.bionano_image.read_bionano_image()
+    
+    def plot_simulated(self):
+        pyplot.subplots(figsize=(30, 3))
+        im, = self.bionano_image.segment_image
+        pyplot.gca().pcolorfast((0, im.shape[-1]), (-.5, .5), im, cmap='gray')
+        pyplot.eventplot(self.simulated.fragment_sitevec / self.simulated.scale + self.simulated.strand_image_offset[0],
+                         lineoffsets=-.2, linelengths=.4, colors='r', alpha=.5)
+        pyplot.grid(False)
+
+        
+    def make_simulated_image(self, refs: dict, rng):
+        xmap_item = self.xmap_item
+        simulated = SimulatedDataItem()
+        simulated.rng = rng
+        simulated.label_eff = 1
+        simulated.lat_size_min = 9
+        simulated.stray_density = 1e-9
+        simulated.scale = Config.BIONANO_NOMINAL_SCALE
+        reference_lims = xmap_item.ref_lims
+        reference_positions = refs[xmap_item.ref_id]
+        start, stop = reference_positions.searchsorted(reference_lims)
+        reference_positions = reference_positions[start:stop + 1]
+        if xmap_item.orientation == "+":
+            simulated.fragment_sitevec = reference_positions - reference_positions[0]
+        elif xmap_item.orientation == "-":
+            simulated.fragment_sitevec = numpy.sort(reference_positions[-1] - reference_positions)
+        else:
+            raise ValueError
+        simulated.xmap_item = xmap_item
+        simulated.make_params()
+        simulated.make_fragment_image()
+        self.simulated = simulated
+        self.bionano_image.segment_image = simulated.image
 
 class BionanoImage:
     bnx_item: BNXItem
@@ -179,6 +219,7 @@ class MoleculeSelector:
     bionano_images_dir = Config.BIONANO_IMAGES_DIR
     xmap_file_data: 'BionanoFileData'
     bnx_file_data: 'BNXFileData'
+    
     top_mol_num: int = 512
     top_mols_by: str = "Confidence"
     same_fov = True
@@ -193,10 +234,15 @@ class MoleculeSelector:
     max_id = None
     scan_ids = None
     jxr_channel = 3
+    
 
-    def __init__(self):
+    def __init__(self, filter_data=False, filter_ids=[],read_images=True):
         self.bnx_file_data = BNXFileData()
         self.xmap_file_data = BionanoFileData()
+        self.filter_data = filter_data
+        self.filter_ids = filter_ids
+        self.simulated_mode = False
+        self.read_images = read_images
 
     def read_files(self):
         self.bnx_file_data.parse_header()
@@ -287,6 +333,7 @@ class MoleculeSelector:
         assert df["JXRFileExists"].all()
 
         df = df[df["JXRFileExists"]]
+
         self.selected_df = df
 
         def _items():
@@ -294,8 +341,11 @@ class MoleculeSelector:
                 bnx_item = BNXItem()
                 bnx_item.meta_fields = self.bnx_file_data.names
                 bnx_item.block_fields = self.bnx_file_data.block_fields
-                bnx_item.parse_bnx(row)
-                yield bnx_item
+                bnx_item.parse_bnx(row,read_image=self.read_images)
+                if self.filter_data is False:
+                    yield bnx_item
+                elif (bnx_item.xmap_item.ref_id in self.filter_ids):
+                    yield bnx_item
 
         self.selected = list(tqdm(_items(), desc="selected"))
 

@@ -13,6 +13,10 @@ class Aligner:
     path_stop: tuple[float, float] = None
     path: ndarray = None
     align_params: dict = {}
+    image_len = 0
+    
+    def add_offset(self,offset):
+        self.offset = offset
 
     def make_alignment(self, qry, ref):
         assert is_sorted(qry) and is_sorted(ref)

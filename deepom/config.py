@@ -18,7 +18,7 @@ class Config:
     BIONANO_IMAGES_DIR = BIONANO_RUN_DIR
     
     GROUND_TRUTH_DIR = DATA_DIR / "ground_truth"
-
+    EVALUATION_DIR = OUT_DIR/ "eval_images"
     BIONANO_BNX_SCALE = 375
     BIONANO_NOMINAL_SCALE = 335
     NM_PER_BP_NOMINAL = 0.34
@@ -30,8 +30,12 @@ class Config:
     LOCALIZER_TRAINING_OUTPUT_DIR = OUT_DIR / "LocalizerModule"
     CHECKPOINT_SEARCH_DIR = Path(__file__).parent.parent / "data/pretrained"
     CHECKPOINT_FILE: str = "checkpoint.pickle"
+    
+    SECOND_CHECKPOINT_SEARCH_DIR = Path(__file__).parent.parent / "data2/pretrained"
+    TEST_LIST_FILE = SECOND_CHECKPOINT_SEARCH_DIR / "test_molecule_list"
 
-
+    MY_LOCALIZER_TRAINING_OUTPUT_DIR = OUT_DIR / "DataLocalizer"
+    
 class Consts:
     PI = numpy.pi
     _2PI = PI * 2
