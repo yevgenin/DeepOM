@@ -72,7 +72,7 @@ class DataLocalizer(metaclass=MetaBase):
         self.epochs = 5
         self.log_images_every = 1000
         self.validation_every = None
-        self.checkpoint_every = 850
+        self.checkpoint_every = 100
         self.nominal_scale = Config.BIONANO_NOMINAL_SCALE
 
         self.module_output_item = LocalizerOutputItem()
@@ -329,8 +329,10 @@ class DataLocalizer(metaclass=MetaBase):
         return self.net(self.to_tensor(x))
 
     def _train_step(self, data):
+        segment_image = data.molecule.bionano_image.segment_image[0]
+        segment_image[0:3] = 0
+        segment_image[-3:] = 0
         image_input = self.image_input(data.molecule.bionano_image.segment_image[0])
-
         x = Compose([
             SpatialPad(spatial_size=self.min_spatial_size, method=Method.END),
             DivisiblePad(k=self.divisible_size, method=Method.END)
