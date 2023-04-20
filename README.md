@@ -1,7 +1,7 @@
 # DeepOM
 
 DeepOM is a Python deep-learning software for optical mapping of DNA images to a genome reference.
-See the [paper](https://www.biorxiv.org/content/10.1101/2022.11.04.512597v1) for details.
+See the [paper](https://doi.org/10.1093/bioinformatics/btad137) for details.
 
 # Installation
 
