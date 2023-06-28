@@ -15,7 +15,6 @@ class Aligner:
     align_params: dict = {}
 
     def make_alignment(self, qry, ref):
-        # assert is_sorted(qry) and is_sorted(ref)
         self.qry = qry
         self.ref = ref
         self.compute_score_matrix()
