@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import fire
+import imagecodecs
 
 from deepom.utils import extract_segment_from_endpoints
 
