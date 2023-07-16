@@ -12,8 +12,8 @@ bnx_parser = BNXParser()
 deep_om_localizer = DeepOMLocalizer()
 genome_pattern_mapper = GenomePatternMapper(
     pattern='CTTAAG',
-    # record_id_prefix='NC_',
-    record_id_prefix='NC_000001.11'
+    record_id_prefix='NC_',
+    # record_id_prefix='NC_000001.11'
 )
 
 with open('./data/GCF_000001405.40_GRCh38.p14_genomic.fna') as f:
