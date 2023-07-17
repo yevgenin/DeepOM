@@ -1,4 +1,5 @@
 #   Running the example script
+Ensure you use python >= 3.10
 ```bash
 cd tool
 python -m venv .venv
