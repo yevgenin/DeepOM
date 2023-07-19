@@ -31,6 +31,11 @@ with open(bnx_file) as f:
 
 with open(bnx_file) as f:
     for molecule in bnx_parser.iter_molecules(f):
+        bnx_molecule = BNXParser.BNXMolecule(**molecule)
+        # skip molecules that span multiple FOVs, since image extraction doesn't work well for them yet
+        if bnx_molecule.StartFOV != bnx_molecule.EndFOV:
+            continue
+
         print(molecule['MoleculeID'])
 
         image = image_reader.read_image(molecule=molecule)['image']
