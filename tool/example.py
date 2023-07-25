@@ -27,7 +27,7 @@ aligner = DeepOMAligner(references=references, scale=335)
 bnx_file = './data/T1_chip2_channels_swapped.bnx'
 
 with open(bnx_file) as f:
-    image_reader = ImageReader(runs=bnx_parser.parse_runs(f), bionano_images_dir=ENV.BIONANO_IMAGES_DIR)
+    image_reader = ImageReader(runs=bnx_parser.parse_runs(f), bionano_images_dir="./data/bionano_runs/2022-04-19")
 
 with open(bnx_file) as f:
     for molecule in bnx_parser.iter_molecules(f):
